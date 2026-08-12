@@ -115,22 +115,45 @@
   scrollbar-width: none;
 }
 
-/* Ensure MindAR video element and A-Frame canvas are full screen and visible */
+/* Dynamic AR Active State for Transparent Canvas & Video Overlays */
+html.ar-active,
+body.ar-active,
+body.ar-active main {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* MindAR Camera Feed Video Element Styling */
+video[srcObject],
 video[id^="mindar"],
-.a-canvas {
-  position: absolute !important;
+body > video {
+  position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
+  width: 100vw !important;
+  height: 100vh !important;
   object-fit: cover !important;
   z-index: 1 !important;
 }
 
-/* Hide MindAR default HTML overlay elements so custom React UI is active */
+/* A-Frame 3D Scene Canvas Styling */
+.a-canvas,
+a-scene {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 2 !important;
+}
+
+/* Hide default MindAR UI and A-Frame VR buttons that cause blank gaps */
 .mindar-ui-overlay,
 .mindar-ui-loading,
 .mindar-ui-scanning,
-.mindar-ui-error {
+.mindar-ui-error,
+.a-enter-vr,
+.a-enter-ar,
+.a-orientation-modal {
   display: none !important;
 }

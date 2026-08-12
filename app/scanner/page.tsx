@@ -130,11 +130,17 @@ export default function ScannerPage() {
     handleTargetLost();
   }, [handleTargetLost]);
 
+  const isARActive = scannerState === "scanning" || scannerState === "target-found";
+
   return (
-    <main className="relative w-full h-full min-h-screen bg-black overflow-hidden select-none">
+    <main
+      className={`relative w-full h-full min-h-screen overflow-hidden select-none ${
+        isARActive ? "bg-transparent" : "bg-[#090510]"
+      }`}
+    >
       {/* 3D AR Camera & Video Layer */}
       <ARScanner
-        isScanning={scannerState === "scanning" || scannerState === "target-found"}
+        isScanning={isARActive}
         activeTargetIndex={activeTargetIndex}
         isMuted={isMuted}
         isMockMode={isMockMode}

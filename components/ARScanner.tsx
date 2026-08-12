@@ -87,7 +87,23 @@ export default function ARScanner({
     };
   }, []);
 
-  // 2. Start/Stop MindAR engine on user action
+  // 2. Manage Body & HTML class for transparent background when scanning
+  useEffect(() => {
+    if (isScanning && !isMockMode) {
+      document.body.classList.add("ar-active");
+      document.documentElement.classList.add("ar-active");
+    } else {
+      document.body.classList.remove("ar-active");
+      document.documentElement.classList.remove("ar-active");
+    }
+
+    return () => {
+      document.body.classList.remove("ar-active");
+      document.documentElement.classList.remove("ar-active");
+    };
+  }, [isScanning, isMockMode]);
+
+  // 3. Start/Stop MindAR engine on user action
   useEffect(() => {
     if (!scriptsLoaded || isMockMode || !sceneRef.current) return;
 
@@ -112,7 +128,7 @@ export default function ARScanner({
       } catch (err: any) {
         console.error("MindAR camera startup error:", err);
         onCameraError(
-          "Camera access failed or targets.mind target file needs binary compilation. (Try Simulation Mode for testing)"
+          "Camera access failed or target file targets.mind needs binary compilation. (Try Simulation Mode for testing)"
         );
       }
     };
@@ -138,7 +154,7 @@ export default function ARScanner({
     };
   }, [isScanning, scriptsLoaded, isMockMode]);
 
-  // 3. Audio state management across videos
+  // 4. Audio state management across videos
   useEffect(() => {
     videoRefs.current.forEach((video) => {
       if (video) {
@@ -147,7 +163,7 @@ export default function ARScanner({
     });
   }, [isMuted]);
 
-  // 4. Target Found & Target Lost Handler Attachments
+  // 5. Target Found & Target Lost Handler Attachments
   useEffect(() => {
     if (!scriptsLoaded || isMockMode || !sceneRef.current) return;
 
@@ -215,11 +231,11 @@ export default function ARScanner({
   return (
     <div
       ref={containerRef}
-      className={`relative w-full h-full min-h-screen overflow-hidden ${
+      className={`fixed inset-0 w-full h-full min-h-screen overflow-hidden ${
         isScanning ? "bg-transparent" : "bg-black"
       }`}
     >
-      {/* 5. MindAR + A-Frame Scene Container */}
+      {/* MindAR + A-Frame Scene Container */}
       {scriptsLoaded && !isMockMode && (
         <a-scene
           ref={sceneRef}
@@ -271,7 +287,7 @@ export default function ARScanner({
         </a-scene>
       )}
 
-      {/* 6. Mock / Desktop Preview Mode Video Player Container */}
+      {/* Mock / Desktop Preview Mode Video Player Container */}
       {isMockMode && activeTargetIndex !== null && (
         <div className="absolute inset-0 flex items-center justify-center p-4 z-20 bg-black/80 backdrop-blur-sm">
           <div className="relative w-full max-w-sm aspect-square rounded-2xl overflow-hidden shadow-2xl border border-pink-500/30 glow-rose">
