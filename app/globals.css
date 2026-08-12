@@ -115,17 +115,19 @@
   scrollbar-width: none;
 }
 
-/* A-Frame MindAR canvas positioning fixes */
+/* Ensure MindAR video element and A-Frame canvas are full screen and visible */
+video[id^="mindar"],
 .a-canvas {
-  width: 100% !important;
-  height: 100% !important;
+  position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
   z-index: 1 !important;
 }
 
-/* Hide MindAR default HTML elements so custom React UI is active */
+/* Hide MindAR default HTML overlay elements so custom React UI is active */
 .mindar-ui-overlay,
 .mindar-ui-loading,
 .mindar-ui-scanning,

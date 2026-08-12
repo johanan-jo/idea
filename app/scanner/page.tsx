@@ -27,11 +27,50 @@ export default function ScannerPage() {
   const [unlockedTargets, setUnlockedTargets] = useState<number[]>([]);
   const [isSceneReady, setIsSceneReady] = useState(false);
 
-  // Start Scanning Trigger
-  const handleStartScanning = useCallback(() => {
-    setPermissionError(null);
-    setScannerState("scanning");
+  // Camera Permission Error Handler
+  const handleCameraError = useCallback((errorMsg: string) => {
+    setPermissionError(errorMsg);
+    setScannerState("permission-denied");
   }, []);
+
+  // Start Scanning Trigger with explicit user-gesture camera permission request
+  const handleStartScanning = useCallback(async () => {
+    setPermissionError(null);
+
+    if (isMockMode) {
+      setScannerState("scanning");
+      return;
+    }
+
+    // Explicit getUserMedia call inside user click handler to satisfy iOS Safari & mobile Chrome security requirements
+    if (typeof window !== "undefined" && navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+
+        // Release temporary test stream so MindAR can claim camera stream
+        stream.getTracks().forEach((track) => track.stop());
+        setScannerState("scanning");
+      } catch (err: any) {
+        console.error("Camera permission request failed:", err);
+        const isNotAllowed =
+          err.name === "NotAllowedError" || err.name === "PermissionDeniedError";
+        handleCameraError(
+          isNotAllowed
+            ? "Camera access denied. Please allow camera permissions in your browser site settings and try again."
+            : "Could not access mobile camera. Please ensure HTTPS connection and camera availability."
+        );
+      }
+    } else {
+      setScannerState("scanning");
+    }
+  }, [isMockMode, handleCameraError]);
 
   // Stop Scanning Trigger
   const handleStopScanning = useCallback(() => {
@@ -59,12 +98,6 @@ export default function ScannerPage() {
     setScannerState((prev) => (prev === "target-found" ? "scanning" : prev));
   }, []);
 
-  // Camera Permission Error Handler
-  const handleCameraError = useCallback((errorMsg: string) => {
-    setPermissionError(errorMsg);
-    setScannerState("permission-denied");
-  }, []);
-
   // Audio Mute Toggle
   const handleToggleMute = useCallback(() => {
     setIsMuted((prev) => !prev);
@@ -75,7 +108,6 @@ export default function ScannerPage() {
     setIsMockMode((prev) => {
       const nextMode = !prev;
       if (nextMode) {
-        // Automatically start scanning in mock mode
         setScannerState("scanning");
       }
       return nextMode;
@@ -83,12 +115,15 @@ export default function ScannerPage() {
   }, []);
 
   // Simulate Target Selection in Mock Mode
-  const handleSimulateTarget = useCallback((index: number) => {
-    const config = getARTarget(index);
-    if (config) {
-      handleTargetFound(config);
-    }
-  }, [handleTargetFound]);
+  const handleSimulateTarget = useCallback(
+    (index: number) => {
+      const config = getARTarget(index);
+      if (config) {
+        handleTargetFound(config);
+      }
+    },
+    [handleTargetFound]
+  );
 
   // Clear Simulated Target
   const handleClearSimulateTarget = useCallback(() => {

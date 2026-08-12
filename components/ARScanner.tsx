@@ -27,7 +27,6 @@ export default function ARScanner({
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<any>(null);
   const [scriptsLoaded, setScriptsLoaded] = useState(false);
-  const [scriptError, setScriptError] = useState<string | null>(null);
   const activeVideoRef = useRef<HTMLVideoElement | null>(null);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
 
@@ -73,9 +72,8 @@ export default function ARScanner({
           onSceneReady();
         }
       } catch (err: any) {
-        console.warn("Could not load MindAR scripts online. Falling back to simulation mode.", err);
+        console.warn("Could not load MindAR scripts online.", err);
         if (isMounted) {
-          setScriptError("WebAR scripts loading fallback.");
           setScriptsLoaded(true);
           onSceneReady();
         }
@@ -112,8 +110,10 @@ export default function ARScanner({
           await arSystem.start();
         }
       } catch (err: any) {
-        console.error("Camera startup error:", err);
-        onCameraError("Camera access denied or unavailable.");
+        console.error("MindAR camera startup error:", err);
+        onCameraError(
+          "Camera access failed or targets.mind target file needs binary compilation. (Try Simulation Mode for testing)"
+        );
       }
     };
 
@@ -125,9 +125,7 @@ export default function ARScanner({
         if (arSystem) {
           arSystem.stop();
         }
-      } catch (e) {
-        // Ignore stop errors
-      }
+      } catch (e) {}
     }
 
     return () => {
@@ -215,7 +213,12 @@ export default function ARScanner({
   const targetsList = Object.values(AR_TARGETS);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
+    <div
+      ref={containerRef}
+      className={`relative w-full h-full min-h-screen overflow-hidden ${
+        isScanning ? "bg-transparent" : "bg-black"
+      }`}
+    >
       {/* 5. MindAR + A-Frame Scene Container */}
       {scriptsLoaded && !isMockMode && (
         <a-scene
