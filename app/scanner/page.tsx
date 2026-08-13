@@ -4,6 +4,8 @@ import React, { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { ARTargetConfig, getARTarget } from "@/config/arTargets";
 import ScannerUI from "@/components/ScannerUI";
+import CapturePhotoScanner from "@/components/CapturePhotoScanner";
+import { ARTelemetryState } from "@/components/ARScanner";
 
 // Dynamically import ARScanner with ssr: false to prevent SSR hydration issues with A-Frame custom elements
 const ARScanner = dynamic(() => import("@/components/ARScanner"), {
@@ -19,6 +21,8 @@ export default function ScannerPage() {
   const [scannerState, setScannerState] = useState<
     "idle" | "scanning" | "target-found" | "permission-denied"
   >("idle");
+
+  const [activeMode, setActiveMode] = useState<"live" | "capture">("live");
   const [activeTarget, setActiveTarget] = useState<ARTargetConfig | null>(null);
   const [activeTargetIndex, setActiveTargetIndex] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(true);
@@ -26,6 +30,18 @@ export default function ScannerPage() {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [unlockedTargets, setUnlockedTargets] = useState<number[]>([]);
   const [isSceneReady, setIsSceneReady] = useState(false);
+
+  const [telemetry, setTelemetry] = useState<ARTelemetryState>({
+    cameraStatus: "idle",
+    mindarStatus: "uninitialized",
+    targetFileStatus: "checking",
+    trackingStatus: "idle",
+    detectedTargetIndex: null,
+    detectedTargetName: null,
+    videoStatus: "idle",
+    videoUrl: null,
+    lastError: null,
+  });
 
   // Camera Permission Error Handler
   const handleCameraError = useCallback((errorMsg: string) => {
@@ -42,7 +58,6 @@ export default function ScannerPage() {
       return;
     }
 
-    // Explicit getUserMedia call inside user click handler to satisfy iOS Safari & mobile Chrome security requirements
     if (typeof window !== "undefined" && navigator?.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -54,7 +69,7 @@ export default function ScannerPage() {
           audio: false,
         });
 
-        // Release temporary test stream so MindAR can claim camera stream
+        // Release temporary test stream so MindAR/Capture mode can claim camera stream
         stream.getTracks().forEach((track) => track.stop());
         setScannerState("scanning");
       } catch (err: any) {
@@ -98,6 +113,14 @@ export default function ScannerPage() {
     setScannerState((prev) => (prev === "target-found" ? "scanning" : prev));
   }, []);
 
+  // Mode Switcher Handler
+  const handleModeChange = useCallback((mode: "live" | "capture") => {
+    setActiveMode(mode);
+    setActiveTarget(null);
+    setActiveTargetIndex(null);
+    setScannerState("scanning");
+  }, []);
+
   // Audio Mute Toggle
   const handleToggleMute = useCallback(() => {
     setIsMuted((prev) => !prev);
@@ -138,26 +161,42 @@ export default function ScannerPage() {
         isARActive ? "bg-transparent" : "bg-[#090510]"
       }`}
     >
-      {/* 3D AR Camera & Video Layer */}
-      <ARScanner
-        isScanning={isARActive}
-        activeTargetIndex={activeTargetIndex}
-        isMuted={isMuted}
-        isMockMode={isMockMode}
-        onTargetFound={handleTargetFound}
-        onTargetLost={handleTargetLost}
-        onCameraError={handleCameraError}
-        onSceneReady={() => setIsSceneReady(true)}
-      />
+      {/* Option 1: 3D AR Camera & Video Layer (Live AR Mode) */}
+      {activeMode === "live" && (
+        <ARScanner
+          isScanning={isARActive}
+          activeTargetIndex={activeTargetIndex}
+          isMuted={isMuted}
+          isMockMode={isMockMode}
+          onTargetFound={handleTargetFound}
+          onTargetLost={handleTargetLost}
+          onCameraError={handleCameraError}
+          onSceneReady={() => setIsSceneReady(true)}
+          onTelemetryUpdate={setTelemetry}
+        />
+      )}
 
-      {/* Romantic Full-Screen UI Layer */}
+      {/* Option 2: Local Capture Photo Scanner (Take Photo Mode) */}
+      {activeMode === "capture" && (
+        <CapturePhotoScanner
+          isActive={isARActive}
+          isMuted={isMuted}
+          onTargetFound={handleTargetFound}
+          onCameraError={handleCameraError}
+        />
+      )}
+
+      {/* Romantic Full-Screen Overlay UI Layer */}
       <ScannerUI
         scannerState={scannerState}
+        activeMode={activeMode}
         activeTarget={activeTarget}
         isMuted={isMuted}
         isMockMode={isMockMode}
         permissionError={permissionError}
         unlockedTargets={unlockedTargets}
+        telemetry={telemetry}
+        onModeChange={handleModeChange}
         onStartScanning={handleStartScanning}
         onStopScanning={handleStopScanning}
         onToggleMute={handleToggleMute}
@@ -168,3 +207,4 @@ export default function ScannerPage() {
     </main>
   );
 }
+

@@ -8,6 +8,7 @@ async function compileTarget() {
   const targetImgPath = path.join(__dirname, '..', 'public', 'targets', 'spiderman_target.jpg');
   if (!fs.existsSync(targetImgPath)) {
     console.error("Target image not found at", targetImgPath);
+    console.log("Tip: You can use the in-app Web Compiler at http://localhost:3000/compiler to compile any photo targets!");
     process.exit(1);
   }
 
@@ -22,26 +23,36 @@ async function compileTarget() {
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-target.prod.js"></script>
   </head>
   <body>
-    <img id="target-img" src="${imgDataUrl}" style="max-width: 800px; max-height: 800px;" />
+    <canvas id="canvas" width="400" height="400"></canvas>
     <script>
       async function runCompile() {
         return new Promise((resolve, reject) => {
-          const img = document.getElementById('target-img');
+          const img = new Image();
           img.onload = async () => {
             try {
-              console.log("Image loaded, initializing MindAR Compiler...");
-              const compiler = new window.MINDAR.IMAGE.Compiler();
-              await compiler.compileImageTargets([img], (progress) => {
-                console.log("Compilation progress:", progress.toFixed(2) + "%");
-              });
-              const exportedData = await compiler.exportData();
-              const array = Array.from(new Uint8Array(exportedData));
-              resolve(array);
+              console.log("Image loaded, scaling canvas to 400px...");
+              const canvas = document.getElementById('canvas');
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, 400, 400);
+
+              const scaledImg = new Image();
+              scaledImg.onload = async () => {
+                console.log("Initializing MindAR Compiler...");
+                const compiler = new window.MINDAR.IMAGE.Compiler();
+                await compiler.compileImageTargets([scaledImg], (progress) => {
+                  console.log("Compilation progress:", progress.toFixed(2) + "%");
+                });
+                const exportedData = await compiler.exportData();
+                const array = Array.from(new Uint8Array(exportedData));
+                resolve(array);
+              };
+              scaledImg.src = canvas.toDataURL("image/jpeg", 0.9);
             } catch(e) {
               reject(e.toString());
             }
           };
           img.onerror = () => reject("Failed to load target image in browser DOM");
+          img.src = "${imgDataUrl}";
         });
       }
     </script>
@@ -83,6 +94,7 @@ async function compileTarget() {
     console.log(`Successfully compiled targets.mind (${buffer.length} bytes)! Saved to ${outputPath}`);
   } catch (err) {
     console.error("Compilation error:", err);
+    console.log("Recommended Alternative: Open http://localhost:3000/compiler in your browser to generate targets.mind with 1 click!");
   } finally {
     await browser.close();
     server.close();
@@ -90,3 +102,4 @@ async function compileTarget() {
 }
 
 compileTarget();
+
