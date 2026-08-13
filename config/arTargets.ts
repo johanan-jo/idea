@@ -50,6 +50,7 @@ export const AR_TARGETS: Record<number, ARTargetConfig> = {
     subtitle: "Golden hour magic",
     description: "Hand in hand, watching waves fade into night.",
     videoUrl: "/videos/video3.mp4",
+    targetImagePreview: "/targets/target2.jpg",
     aspectRatio: 1.0,
     planeWidth: 1,
     planeHeight: 1,
