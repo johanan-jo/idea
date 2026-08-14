@@ -37,6 +37,7 @@ class ReferenceMatcher:
 
         targets = data.get("targets", [])
         loaded_count = 0
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(self.config_path)))
 
         for t in targets:
             tid = t["id"]
@@ -45,9 +46,13 @@ class ReferenceMatcher:
             self.target_thresholds[tid] = t.get("threshold", 0.75)
 
             for ref_filename in t.get("references", []):
-                ref_path = os.path.join(self.references_dir, ref_filename)
-                if not os.path.exists(ref_path):
-                    print(f"[ReferenceMatcher] Warning: Reference image not found: {ref_path}")
+                # Try direct path, relative to base_dir, or relative to references_dir
+                if os.path.exists(os.path.join(base_dir, ref_filename)):
+                    ref_path = os.path.join(base_dir, ref_filename)
+                elif os.path.exists(os.path.join(self.references_dir, ref_filename)):
+                    ref_path = os.path.join(self.references_dir, ref_filename)
+                else:
+                    print(f"[ReferenceMatcher] Warning: Reference image not found: {ref_filename}")
                     continue
 
                 img_bgr = cv2.imread(ref_path)

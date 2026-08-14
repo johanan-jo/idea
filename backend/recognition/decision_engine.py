@@ -1,124 +1,141 @@
 """
-Decision Engine for Multi-Method Recognition.
-Combines Feature Matching, HSV Color, and dHash results with priority rules and agreement bonuses.
+Decision Engine for Multi-Algorithm Recognition.
+Combines Vision Embedding (Primary), OpenCV Feature Verification (Secondary),
+and Color/dHash (Tertiary Fallback) with margin checks and agreement bonuses.
 """
 
+import os
 from typing import Dict, List, Optional, Any
 
 class DecisionEngine:
     def __init__(
         self,
-        feature_threshold: float = 0.75,
-        fallback_threshold: float = 0.82,
-        agreement_bonus: float = 0.10,
-        min_gap: float = 0.05
+        match_threshold: Optional[float] = None,
+        min_margin: Optional[float] = None,
+        agreement_bonus: float = 0.08,
+        opencv_inliers_thresh: int = 12
     ):
-        self.feature_threshold = feature_threshold
-        self.fallback_threshold = fallback_threshold
+        # Allow environment variable overrides
+        self.match_threshold = match_threshold or float(os.environ.get("MATCH_THRESHOLD", "0.78"))
+        self.min_margin = min_margin or float(os.environ.get("MIN_MARGIN", "0.05"))
         self.agreement_bonus = agreement_bonus
-        self.min_gap = min_gap
+        self.opencv_inliers_thresh = opencv_inliers_thresh
 
     def decide(
         self,
-        matches_dict: Dict[str, List[Dict[str, Any]]],
+        vision_result: Dict[str, Any],
+        opencv_matches: Dict[str, List[Dict[str, Any]]],
         target_videos: Dict[str, str],
         target_thresholds: Dict[str, float]
     ) -> Dict[str, Any]:
         """
-        Evaluate candidate matches from all algorithms and produce the final decision.
+        Evaluate candidate matches from Vision Embedder and OpenCV pipelines.
+        Returns clean standardized recognition decision with debug metrics.
         """
-        feature_matches = matches_dict.get("features", [])
-        color_matches = matches_dict.get("color", [])
-        dhash_matches = matches_dict.get("dhash", [])
+        top_tid = vision_result.get("top_target")
+        top_score = vision_result.get("top_score", 0.0)
+        second_tid = vision_result.get("second_target")
+        second_score = vision_result.get("second_score", 0.0)
+        margin = vision_result.get("margin", 0.0)
+        best_ref = vision_result.get("best_reference")
 
-        # Index auxiliary scores by target_id
-        color_by_target = {m["target_id"]: m["confidence"] for m in color_matches}
-        dhash_by_target = {m["target_id"]: m["confidence"] for m in dhash_matches}
+        # Extract OpenCV features and fallback
+        feature_matches = opencv_matches.get("features", [])
+        color_matches = opencv_matches.get("color", [])
+        dhash_matches = opencv_matches.get("dhash", [])
 
-        # ── PRIORITY 1: Visual Feature / Reference Matching ──────────────────────
+        # Check OpenCV agreement
+        opencv_agree = False
+        opencv_inliers = 0
+        opencv_top_target = None
+
         if feature_matches:
-            best_feat = feature_matches[0]
-            tid = best_feat["target_id"]
-            threshold = target_thresholds.get(tid, self.feature_threshold)
+            top_feat = feature_matches[0]
+            opencv_top_target = top_feat.get("target_id")
+            opencv_inliers = top_feat.get("inliers", 0)
+            if opencv_top_target == top_tid and opencv_inliers >= self.opencv_inliers_thresh:
+                opencv_agree = True
 
-            # Check gap if there is a second feature match
-            gap_ok = True
-            if len(feature_matches) >= 2:
-                gap = best_feat["confidence"] - feature_matches[1]["confidence"]
-                if gap < self.min_gap:
-                    gap_ok = False
+        effective_threshold = target_thresholds.get(top_tid, self.match_threshold) if top_tid else self.match_threshold
 
-            if best_feat["confidence"] >= threshold and gap_ok:
-                # Check for agreement bonus with color or dHash
-                has_agreement = False
-                final_conf = best_feat["confidence"]
+        # ── PRIORITY 1: Vision Embedding Match ────────────────────────────────
+        if top_tid and top_score >= effective_threshold and margin >= self.min_margin:
+            final_conf = top_score
+            method = "vision_embedding"
 
-                if color_by_target.get(tid, 0.0) >= 0.70 or dhash_by_target.get(tid, 0.0) >= 0.70:
-                    has_agreement = True
-                    final_conf = min(1.0, final_conf + self.agreement_bonus)
+            if opencv_agree:
+                final_conf = min(0.99, final_conf + self.agreement_bonus)
+                method = "vision_plus_opencv"
 
+            return {
+                "matched": True,
+                "target_id": top_tid,
+                "method": method,
+                "reference": best_ref,
+                "confidence": round(float(final_conf), 3),
+                "margin": round(float(margin), 3),
+                "video": target_videos.get(top_tid),
+                "debug": {
+                    "vision_score": round(float(top_score), 4),
+                    "second_best_target": second_tid,
+                    "second_best_score": round(float(second_score), 4),
+                    "margin": round(float(margin), 4),
+                    "opencv_inliers": opencv_inliers,
+                    "opencv_agreed": opencv_agree,
+                    "ranked_targets": vision_result.get("ranked_targets", [])
+                }
+            }
+
+        # ── PRIORITY 2: Secondary OpenCV Fallback (If Vision Embedding is Borderline) ─
+        if feature_matches:
+            top_feat = feature_matches[0]
+            feat_tid = top_feat["target_id"]
+            inliers = top_feat.get("inliers", 0)
+
+            # If OpenCV finds strong geometric match (>= 15 inliers)
+            if inliers >= 15 and top_feat.get("confidence", 0.0) >= 0.75:
                 return {
                     "matched": True,
-                    "target_id": tid,
-                    "method": "reference",
-                    "reference": best_feat.get("reference"),
-                    "confidence": round(float(final_conf), 3),
-                    "video": target_videos.get(tid),
+                    "target_id": feat_tid,
+                    "method": "opencv",
+                    "reference": top_feat.get("reference"),
+                    "confidence": round(float(top_feat["confidence"]), 3),
+                    "margin": round(float(margin), 3),
+                    "video": target_videos.get(feat_tid),
                     "debug": {
-                        "primary_score": round(best_feat["confidence"], 3),
-                        "inliers": best_feat.get("inliers", 0),
-                        "color_score": round(color_by_target.get(tid, 0.0), 3),
-                        "dhash_score": round(dhash_by_target.get(tid, 0.0), 3),
-                        "has_agreement": has_agreement,
-                        "method": "feature_orb"
+                        "vision_score": round(float(top_score), 4),
+                        "opencv_inliers": inliers,
+                        "method": "opencv_fallback"
                     }
                 }
 
-        # ── PRIORITY 2: Hue (55%) + dHash (30%) + Saturation (15%) Fallback ──────
-        # Combine color and dHash scores per target
-        all_targets = set(color_by_target.keys()).union(dhash_by_target.keys())
-        fallback_candidates = []
+        # ── PRIORITY 3: Tertiary Color + dHash Fallback ───────────────────────
+        color_by_target = {m["target_id"]: m["confidence"] for m in color_matches}
+        dhash_by_target = {m["target_id"]: m["confidence"] for m in dhash_matches}
 
-        for tid in all_targets:
-            c_score = color_by_target.get(tid, 0.0)
-            d_score = dhash_by_target.get(tid, 0.0)
-            
-            # Weighted: 70% dHash structure + 30% Color (or 55% color + 45% dHash)
-            combined = (d_score * 0.55) + (c_score * 0.45)
-            fallback_candidates.append({
-                "target_id": tid,
-                "combined": combined,
-                "color_score": c_score,
-                "dhash_score": d_score
-            })
+        all_tids = set(color_by_target.keys()).union(dhash_by_target.keys())
+        fallback_candidates = []
+        for tid in all_tids:
+            c = color_by_target.get(tid, 0.0)
+            d = dhash_by_target.get(tid, 0.0)
+            combined = (d * 0.55) + (c * 0.45)
+            fallback_candidates.append({"target_id": tid, "combined": combined})
 
         fallback_candidates.sort(key=lambda x: x["combined"], reverse=True)
-
         if fallback_candidates:
             best_fb = fallback_candidates[0]
-            tid = best_fb["target_id"]
-            
-            # Fallback requires high score and clear separation from second place
-            gap_ok = True
-            if len(fallback_candidates) >= 2:
-                gap = best_fb["combined"] - fallback_candidates[1]["combined"]
-                if gap < 0.08:
-                    gap_ok = False
-
-            if best_fb["combined"] >= self.fallback_threshold and gap_ok:
+            if best_fb["combined"] >= 0.85:
                 return {
                     "matched": True,
-                    "target_id": tid,
-                    "method": "fallback_color_dhash",
+                    "target_id": best_fb["target_id"],
+                    "method": "color_fallback",
                     "reference": None,
                     "confidence": round(float(best_fb["combined"]), 3),
-                    "video": target_videos.get(tid),
+                    "margin": 0.0,
+                    "video": target_videos.get(best_fb["target_id"]),
                     "debug": {
-                        "primary_score": round(best_fb["combined"], 3),
-                        "color_score": round(best_fb["color_score"], 3),
-                        "dhash_score": round(best_fb["dhash_score"], 3),
-                        "has_agreement": True,
-                        "method": "color_dhash_fallback"
+                        "fallback_score": round(float(best_fb["combined"]), 3),
+                        "vision_score": round(float(top_score), 4)
                     }
                 }
 
@@ -126,12 +143,15 @@ class DecisionEngine:
         return {
             "matched": False,
             "target_id": None,
-            "method": None,
-            "reference": None,
-            "confidence": 0.0,
+            "method": "none",
+            "reference": best_ref,
+            "confidence": round(float(top_score), 3),
+            "margin": round(float(margin), 3),
             "video": None,
             "debug": {
-                "top_feature": feature_matches[0] if feature_matches else None,
-                "top_fallback": fallback_candidates[0] if fallback_candidates else None
+                "top_vision_score": round(float(top_score), 4),
+                "second_vision_score": round(float(second_score), 4),
+                "margin": round(float(margin), 4),
+                "threshold_required": effective_threshold
             }
         }

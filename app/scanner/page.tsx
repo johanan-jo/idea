@@ -60,6 +60,7 @@ interface BackendDebugInfo {
   lastResponseMs?: number;
   method?: string;
   confidence?: string;
+  margin?: string;
   inliers?: number;
   detectedTarget?: string;
 }
@@ -244,7 +245,8 @@ export default function ScannerPage() {
               lastResponseMs: elapsed,
               method: data.method,
               confidence: `${(data.confidence * 100).toFixed(1)}%`,
-              inliers: data.debug?.inliers,
+              margin: data.margin !== undefined ? `${(data.margin * 100).toFixed(1)}%` : undefined,
+              inliers: data.debug?.opencv_inliers,
               detectedTarget: t.name,
             }));
           }
