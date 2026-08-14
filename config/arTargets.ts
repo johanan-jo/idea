@@ -66,6 +66,7 @@ export const AR_TARGETS: Record<number, ARTargetConfig> = {
     subtitle: "A gift of memories",
     description: "To many more chapters written together with love.",
     videoUrl: "/videos/video4.mp4",
+    targetImagePreview: "/targets/target4.jpg",
     aspectRatio: 1.0,
     planeWidth: 1,
     planeHeight: 1,

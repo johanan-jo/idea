@@ -66,13 +66,15 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
   },
   {
     id: "birthday",
-    name: "Birthday Celebration",
+    name: "Beach Celebration",
     videoUrl: "/videos/video4.mp4",
     mindarTargetIndices: [3],
-    referenceImages: [],
+    referenceImages: [
+      "/targets/target4.jpg",
+    ],
     referenceThreshold: 0.78,
     badge: "Memory #4",
-    description: "To many more chapters written together",
+    description: "Beach memories together",
     previewColor: "from-purple-500 to-amber-500",
   },
 ];
