@@ -1,14 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // referenceImageMatcher.ts
 //
-// Robust Visual Feature + Color Hybrid Matcher with 360° Rotation Invariance.
-// Works across the ENTIRE captured frame (horizontal & vertical orientations).
+// Robust Visual Feature + Color Distribution Matcher with 360° Rotation Invariance.
 //
 // Features:
-//   • 60% Multi-scale HOG Structure + 40% Color Distribution Histogram
-//   • Full-frame + Multi-region sampling (Entire capture, 85% center, 65% center, 4 quadrants)
-//   • 4-Way Rotation Invariance (0°, 90°, 180°, 270°) for portrait & landscape scans
-//   • Scale & Lighting invariant
+//   • 70% Multi-scale HOG Structure + 30% High-Resolution 48-Bin Color Distribution
+//   • Edge-to-Edge Full-Frame + Multi-Region Sampling
+//   • 4-Way Rotation Invariance (0°, 90°, 180°, 270°)
+//   • Strong false-positive rejection for random objects/desks/walls
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -100,12 +99,13 @@ function computeHOG(imageData: ImageData): Float32Array {
 
 function computeColorHist(imageData: ImageData): Float32Array {
   const data = imageData.data;
-  const bins = new Float32Array(24); // 8 R, 8 G, 8 B
+  // 48 bins: 16 Red, 16 Green, 16 Blue
+  const bins = new Float32Array(48);
 
   for (let i = 0; i < data.length; i += 4) {
-    bins[Math.min(7, Math.floor(data[i] / 32))]++;
-    bins[8 + Math.min(7, Math.floor(data[i + 1] / 32))]++;
-    bins[16 + Math.min(7, Math.floor(data[i + 2] / 32))]++;
+    bins[Math.min(15, Math.floor(data[i] / 16))]++;
+    bins[16 + Math.min(15, Math.floor(data[i + 1] / 16))]++;
+    bins[32 + Math.min(15, Math.floor(data[i + 2] / 16))]++;
   }
 
   const total = data.length / 4;
@@ -208,21 +208,18 @@ export function matchReferenceImages(
   const W = captureData.width;
   const H = captureData.height;
 
-  // Multi-region and multi-orientation sampling across the whole captured frame
-  const regions: Array<{ name: string; data: ImageData }> = [];
-
-  // Base spatial crop regions across the entire photo
+  // Spatial crop regions across the entire photo
   const cropBoxes = [
-    { name: "full",         x: 0,       y: 0,       w: W,        h: H },
-    { name: "center85",     x: W * 0.075, y: H * 0.075, w: W * 0.85, h: H * 0.85 },
-    { name: "center65",     x: W * 0.175, y: H * 0.175, w: W * 0.65, h: H * 0.65 },
-    { name: "top-left",     x: 0,       y: 0,       w: W * 0.65, h: H * 0.65 },
-    { name: "top-right",    x: W * 0.35, y: 0,       w: W * 0.65, h: H * 0.65 },
-    { name: "bottom-left",  x: 0,       y: H * 0.35, w: W * 0.65, h: H * 0.65 },
-    { name: "bottom-right", x: W * 0.35, y: H * 0.35, w: W * 0.65, h: H * 0.65 },
+    { name: "full",         x: 0,         y: 0,         w: W,          h: H },
+    { name: "center85",     x: W * 0.075, y: H * 0.075, w: W * 0.85,   h: H * 0.85 },
+    { name: "center65",     x: W * 0.175, y: H * 0.175, w: W * 0.65,   h: H * 0.65 },
+    { name: "top-left",     x: 0,         y: 0,         w: W * 0.65,   h: H * 0.65 },
+    { name: "top-right",    x: W * 0.35,  y: 0,         w: W * 0.65,   h: H * 0.65 },
+    { name: "bottom-left",  x: 0,         y: H * 0.35,  w: W * 0.65,   h: H * 0.65 },
+    { name: "bottom-right", x: W * 0.35,  y: H * 0.35,  w: W * 0.65,   h: H * 0.65 },
   ];
 
-  // Test across all 4 orientations (0°, 90°, 180°, 270°) for full portrait & landscape invariance
+  const regions: Array<{ name: string; data: ImageData }> = [];
   const rotations = [0, 90, 180, 270];
 
   for (const box of cropBoxes) {
@@ -250,8 +247,8 @@ export function matchReferenceImages(
       const hogScore = cosineSim(desc.hog, r.hog);
       const colorScore = bhattacharyya(desc.colorHist, r.colorHist);
 
-      // 60% HOG structure + 40% Color distribution
-      const score = (hogScore * 0.60) + (colorScore * 0.40);
+      // 70% HOG structural shape + 30% Color distribution
+      const score = (hogScore * 0.70) + (colorScore * 0.30);
 
       if (score > bestScore) {
         bestScore = score;
@@ -269,7 +266,7 @@ export function matchReferenceImages(
     }
   }
 
-  // Deduplicate by targetId (keep best confidence per target)
+  // Deduplicate by targetId (keep highest confidence per target)
   const targetMap = new Map<string, ReferenceMatchResult>();
   for (const res of results) {
     const existing = targetMap.get(res.targetId);
@@ -280,8 +277,8 @@ export function matchReferenceImages(
 
   const ranked = Array.from(targetMap.values()).sort((a, b) => b.confidence - a.confidence);
 
-  // Require minimum confidence gap if multiple targets passed threshold
-  const MIN_GAP = 0.05;
+  // Require minimum confidence gap (0.06) if multiple targets passed threshold
+  const MIN_GAP = 0.06;
   if (ranked.length >= 2 && (ranked[0].confidence - ranked[1].confidence) < MIN_GAP) {
     console.log(`[RefMatcher] Ambiguous match: ${ranked[0].targetId} (${ranked[0].confidence.toFixed(2)}) vs ${ranked[1].targetId} (${ranked[1].confidence.toFixed(2)})`);
     return [];

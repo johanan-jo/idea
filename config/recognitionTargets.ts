@@ -3,7 +3,7 @@
 //
 // SINGLE CONFIGURATION FILE for the hybrid recognition system.
 //
-// Mapping:
+// Target Mapping:
 //   Photo 1 (Spider-Man)  -> /videos/video1.mp4
 //   Photo 2 (Sai Baba)    -> /videos/video2.mp4
 //   Photo 3 (Girls + 👍)  -> /videos/video3.mp4
@@ -32,7 +32,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
       "/targets/spiderman_target.jpg",
       "/references/spiderman_marker.png",
     ],
-    referenceThreshold: 0.65,
+    referenceThreshold: 0.78,
     badge: "Memory #1",
     description: "Physical comic book photo",
     previewColor: "from-red-600 to-rose-700",
@@ -45,7 +45,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     referenceImages: [
       "/targets/target2.jpg",
     ],
-    referenceThreshold: 0.65,
+    referenceThreshold: 0.78,
     badge: "Memory #2",
     description: "Sai Baba blessing memory",
     previewColor: "from-amber-400 to-orange-500",
@@ -59,7 +59,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
       "/targets/target3.jpg",
       "/references/thumbs_up.png",
     ],
-    referenceThreshold: 0.65,
+    referenceThreshold: 0.78,
     badge: "Memory #3",
     description: "Special memory with thumbs up",
     previewColor: "from-pink-500 to-rose-600",
@@ -70,7 +70,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     videoUrl: "/videos/video4.mp4",
     mindarTargetIndices: [3],
     referenceImages: [],
-    referenceThreshold: 0.75,
+    referenceThreshold: 0.78,
     badge: "Memory #4",
     description: "To many more chapters written together",
     previewColor: "from-purple-500 to-amber-500",
@@ -86,6 +86,7 @@ export const getTargetByMindarIndex = (index: number): RecognitionTarget | undef
 export const getTargetsWithReferenceImages = (): RecognitionTarget[] =>
   RECOGNITION_TARGETS.filter(t => t.referenceImages.length > 0);
 
-export const DEFAULT_REFERENCE_THRESHOLD = 0.65;
-export const FALLBACK_COLOR_THRESHOLD = 65;
+/** Threshold: 0.78 (Real targets score >95%, random images score <35%) */
+export const DEFAULT_REFERENCE_THRESHOLD = 0.78;
+export const FALLBACK_COLOR_THRESHOLD = 75;
 export const AGREEMENT_BONUS = 0.10;
