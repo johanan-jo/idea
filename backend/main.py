@@ -56,11 +56,10 @@ async def lifespan(app: FastAPI):
         target_videos[tid] = t.get("video", "")
         target_thresholds[tid] = t.get("threshold", 0.78)
 
-    # 2. Initialize and precompute Vision Embeddings (OpenCLIP)
-    model_name = os.environ.get("VISION_MODEL", "ViT-B-32")
-    pretrained_weights = os.environ.get("VISION_PRETRAINED", "laion2b_s34b_b79k")
+    # 2. Initialize and precompute Vision Embeddings (MobileNetV3-Large, ~21MB weights)
+    model_name = os.environ.get("VISION_MODEL", "mobilenet_v3_large")
     
-    vision_engine = VisionEmbedder(model_name=model_name, pretrained=pretrained_weights)
+    vision_engine = VisionEmbedder(model_name=model_name)
     vision_engine.load_model()
     num_embeddings = vision_engine.load_and_precompute_references(
         config_path=CONFIG_PATH,

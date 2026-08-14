@@ -26,8 +26,8 @@ def run_calibration():
     print("  VISION EMBEDDING RECOGNITION CALIBRATION SUITE")
     print("=======================================================\n")
 
-    # 1. Initialize Vision Embedder
-    embedder = VisionEmbedder(model_name="ViT-B-32", pretrained="laion2b_s34b_b79k")
+    # 1. Initialize Vision Embedder (Lightweight MobileNetV3-Large, ~21MB)
+    embedder = VisionEmbedder(model_name="mobilenet_v3_large")
     embedder.load_model()
     num_refs = embedder.load_and_precompute_references(config_path, base_dir, cache_dir)
     print(f"Loaded {num_refs} reference embeddings across all targets.\n")

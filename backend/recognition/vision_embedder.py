@@ -1,7 +1,7 @@
 """
-Vision Embedding Engine using Pretrained Vision Encoder (OpenCLIP / CLIP).
-Precomputes and caches reference image embeddings in RAM at startup and evaluates
-incoming camera frames via high-dimensional cosine similarity.
+High-Performance, Low-Memory Vision Embedding Engine.
+Uses Pretrained MobileNetV3-Large / Vision Backbone to generate 960-dim normalized embeddings.
+Ultra-lightweight (~21MB weights, <80MB RAM) designed specifically for 512MB RAM constraints on Render.
 """
 
 import os
@@ -9,7 +9,7 @@ import io
 import time
 import json
 import torch
-import open_clip
+import torchvision.models as models
 import numpy as np
 from PIL import Image, ImageEnhance
 from typing import Dict, List, Optional, Tuple, Any
@@ -18,49 +18,48 @@ class ReferenceVector:
     def __init__(self, target_id: str, relative_path: str, embedding: np.ndarray):
         self.target_id = target_id
         self.relative_path = relative_path
-        self.embedding = embedding  # (D,) float32 unit vector
+        self.embedding = embedding  # (960,) float32 unit vector
 
 class VisionEmbedder:
     def __init__(
         self,
-        model_name: str = "ViT-B-32",
-        pretrained: str = "laion2b_s34b_b79k",
+        model_name: str = "mobilenet_v3_large",
         device: Optional[str] = None
     ):
         self.model_name = model_name
-        self.pretrained = pretrained
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         
         self.model = None
         self.preprocess = None
         self.references_db: List[ReferenceVector] = []
-        self.ref_matrix: Optional[np.ndarray] = None  # (N, D)
+        self.ref_matrix: Optional[np.ndarray] = None  # (N, 960)
         self.ref_metadata: List[Tuple[str, str]] = [] # [(target_id, path), ...]
 
     def load_model(self):
-        """Load pretrained OpenCLIP model and preprocessing transforms."""
-        print(f"[VisionEmbedder] Loading OpenCLIP model '{self.model_name}' ({self.pretrained}) on {self.device}...")
+        """Load pretrained vision encoder with classification head removed."""
+        print(f"[VisionEmbedder] Loading lightweight Vision Encoder '{self.model_name}' on {self.device}...")
         t0 = time.perf_counter()
         
-        self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-            self.model_name,
-            pretrained=self.pretrained,
-            device=self.device
-        )
-        self.model.eval()
+        # Load MobileNetV3-Large (only 21MB, extremely fast on CPU)
+        weights = models.MobileNet_V3_Large_Weights.DEFAULT
+        self.preprocess = weights.transforms()
+        
+        model = models.mobilenet_v3_large(weights=weights)
+        model.classifier = torch.nn.Identity() # Extract raw 960-dim visual embeddings
+        model.eval()
+        
+        self.model = model.to(self.device)
         t_elapsed = round(time.perf_counter() - t0, 2)
-        print(f"[VisionEmbedder] Model loaded in {t_elapsed}s.")
+        print(f"[VisionEmbedder] Model ready in {t_elapsed}s (~21MB RAM).")
 
     def preprocess_pil(self, img: Image.Image) -> Image.Image:
-        """Apply mild lighting/contrast stabilization before encoding."""
+        """Apply contrast and illumination stabilization."""
         img = img.convert("RGB")
-        # Mild contrast enhancement for washed-out phone camera shots
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.05)
-        return img
+        return enhancer.enhance(1.05)
 
     def encode_pil(self, image_pil: Image.Image) -> np.ndarray:
-        """Generate a 512-dimensional L2-normalized embedding vector from a PIL Image."""
+        """Generate a 960-dimensional L2-normalized embedding vector from a PIL Image."""
         if self.model is None:
             self.load_model()
 
@@ -68,7 +67,8 @@ class VisionEmbedder:
         tensor = self.preprocess(clean_img).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
-            features = self.model.encode_image(tensor)
+            features = self.model(tensor)
+            # L2 Unit Normalization
             features = features / features.norm(dim=-1, keepdim=True)
             emb = features.cpu().numpy().flatten().astype(np.float32)
 
@@ -94,7 +94,7 @@ class VisionEmbedder:
     ) -> int:
         """
         Load target definitions and precompute embeddings for all registered references.
-        Optionally caches/loads from disk cache to speed up restarts.
+        Caches/loads from disk cache to speed up restarts.
         """
         if self.model is None:
             self.load_model()
@@ -105,7 +105,6 @@ class VisionEmbedder:
         self.references_db = []
         cache_file = os.path.join(cache_dir, f"embeddings_{self.model_name}.npz") if cache_dir else None
 
-        # Check if cache is available and valid
         cache_loaded = False
         if cache_file and os.path.exists(cache_file):
             try:
@@ -129,7 +128,6 @@ class VisionEmbedder:
                 tid = t["id"]
                 refs = t.get("references", [])
                 
-                # If directory specified, collect all images
                 ref_dir = t.get("reference_dir")
                 if ref_dir:
                     full_ref_dir = os.path.join(base_dir, ref_dir)
@@ -154,7 +152,6 @@ class VisionEmbedder:
                     except Exception as err:
                         print(f"[VisionEmbedder] Could not encode {full_path}: {err}")
 
-            # Save to disk cache if cache_dir is provided
             if cache_file and len(self.references_db) > 0:
                 try:
                     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
@@ -168,9 +165,8 @@ class VisionEmbedder:
                 except Exception as ce:
                     print(f"[VisionEmbedder] Cache save warning: {ce}")
 
-        # Assemble fast matrix for batched cosine similarity
         if self.references_db:
-            self.ref_matrix = np.stack([r.embedding for r in self.references_db], axis=0) # (N, 512)
+            self.ref_matrix = np.stack([r.embedding for r in self.references_db], axis=0) # (N, 960)
             self.ref_metadata = [(r.target_id, r.relative_path) for r in self.references_db]
 
         return len(self.references_db)
@@ -189,10 +185,9 @@ class VisionEmbedder:
                 "ranked_targets": []
             }
 
-        # Dot product of normalized vectors = Cosine Similarity (-1.0 to 1.0)
+        # Matrix dot product of normalized vectors = Cosine Similarity (-1.0 to 1.0)
         sims = np.dot(self.ref_matrix, query_embedding) # (N,)
         
-        # Group by target ID and compute max score per target
         target_scores: Dict[str, float] = {}
         best_ref_per_target: Dict[str, str] = {}
         all_ref_scores: Dict[str, List[float]] = {}
