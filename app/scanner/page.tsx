@@ -1,11 +1,18 @@
 "use client";
 
 /**
- * Photo-Capture Hybrid Scanner
+ * Clean, Full-Screen Photo-Capture Scanner
  *
- * User points camera at photo → presses shutter → system analyses features & colors → plays correct video.
+ * Uses native HTML5 Camera (getUserMedia) for 100% reliable full-screen capture
+ * without A-Frame / MindAR canvas conflicts or blank screens.
  *
- * Targets:
+ * Recognition Pipeline:
+ *   1. User points camera at physical photo
+ *   2. User taps shutter button
+ *   3. Frame analyzed via 60% HOG Structure + 40% Color Distribution
+ *   4. Highest scoring target (>= 60%) plays its linked video
+ *
+ * Target Mapping:
  *   Photo 1 (Spider-Man)  -> /videos/video1.mp4
  *   Photo 2 (Sai Baba)    -> /videos/video2.mp4
  *   Photo 3 (Girls + 👍)  -> /videos/video3.mp4
@@ -23,8 +30,6 @@ import {
 import {
   RECOGNITION_TARGETS,
   getTargetById,
-  getTargetByMindarIndex,
-  DEFAULT_REFERENCE_THRESHOLD,
 } from "@/config/recognitionTargets";
 import type { RecognitionTarget } from "@/config/recognitionTargets";
 import {
@@ -32,16 +37,14 @@ import {
   matchReferenceImages,
 } from "@/lib/referenceImageMatcher";
 import type { ReferenceDescriptor, ReferenceMatchResult } from "@/lib/referenceImageMatcher";
-import ARScanner from "@/components/ARScanner";
-import type { ARTelemetryState } from "@/components/ARScanner";
 
 type Phase =
-  | "idle"        // Landing card
-  | "camera"      // Camera live, viewfinder active
-  | "analysing"   // Photo captured, running feature + color matching
-  | "matched"     // Confident match found → video playing
+  | "idle"        // Start page
+  | "camera"      // Native camera active
+  | "analysing"   // Photo captured, running feature + color matcher
+  | "matched"     // Match found -> video playing
   | "no_match"    // No confident match
-  | "error";      // Camera error
+  | "error";      // Permission error
 
 interface DebugState {
   camera: string;
@@ -66,12 +69,13 @@ const INIT_DEBUG: DebugState = {
 };
 
 export default function ScannerPage() {
+  const videoRef         = useRef<HTMLVideoElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const playVideoRef     = useRef<HTMLVideoElement>(null);
+  const streamRef        = useRef<MediaStream | null>(null);
   const refDescsRef      = useRef<ReferenceDescriptor[] | null>(null);
 
   const [phase,         setPhase]         = useState<Phase>("idle");
-  const [isScanning,    setIsScanning]    = useState(false);
   const [matchedTarget, setMatchedTarget] = useState<RecognitionTarget | null>(null);
   const [capturedUrl,   setCapturedUrl]   = useState<string | null>(null);
   const [isMuted,       setIsMuted]       = useState(true);
@@ -79,86 +83,103 @@ export default function ScannerPage() {
   const [scanProgress,  setScanProgress]  = useState(0);
   const [statusText,    setStatusText]    = useState("");
   const [showDebug,     setShowDebug]     = useState(false);
-  const [isMock,        setIsMock]        = useState(false);
   const [debug,         setDebug]         = useState<DebugState>(INIT_DEBUG);
 
-  // Pre-load reference descriptors on mount
+  // Pre-load reference image descriptors on startup
   useEffect(() => {
     buildReferenceDescriptors()
       .then(descs => {
         refDescsRef.current = descs;
-        setDebug(d => ({ ...d, refMatcher: `✓ ${descs.length} references loaded` }));
+        setDebug(d => ({ ...d, refMatcher: `✓ ${descs.length} references ready` }));
         console.log(`[Scanner] Loaded ${descs.length} reference descriptors.`);
       })
       .catch(err => {
-        setDebug(d => ({ ...d, refMatcher: "✗ Failed to load" }));
+        setDebug(d => ({ ...d, refMatcher: "✗ Load error" }));
         console.warn("[Scanner] Reference loading error:", err);
       });
   }, []);
 
-  // Detect desktop/mock mode
-  useEffect(() => {
-    const ua = navigator.userAgent.toLowerCase();
-    setIsMock(!(/android|iphone|ipad|ipod|mobile/i.test(ua)) && !window.location.search.includes("force-ar"));
-  }, []);
+  // ── Native Camera Management ──────────────────────────────────────────────
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
 
-  const onCameraError = useCallback((msg: string) => {
-    setCameraError(msg);
-    setDebug(d => ({ ...d, camera: "✗ Error" }));
-  }, []);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+        },
+        audio: false,
+      });
 
-  const onSceneReady = useCallback(() => {
-    setDebug(d => ({ ...d, camera: "✓ Ready" }));
-    setPhase("camera");
-  }, []);
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
 
-  const onTelemetryUpdate = useCallback((t: ARTelemetryState) => {
-    setDebug(d => ({
-      ...d,
-      camera: t.cameraStatus === "ready" ? "✓ Active" : t.cameraStatus === "error" ? "✗ Error" : t.cameraStatus,
-    }));
-  }, []);
-
-  function findCameraVideo(): HTMLVideoElement | null {
-    for (const sel of ["a-scene video", "video[autoplay]", "video[playsinline]"]) {
-      const el = document.querySelector<HTMLVideoElement>(sel);
-      if (el && el.videoWidth > 0) return el;
+      setDebug(d => ({ ...d, camera: "✓ Live (Native)" }));
+      setPhase("camera");
+    } catch (err: any) {
+      console.error("Camera startup error:", err);
+      const msg = err.name === "NotAllowedError"
+        ? "Camera permission denied. Please allow camera access in your browser settings."
+        : `Camera error: ${err.message || "Failed to start camera."}`;
+      setCameraError(msg);
+      setDebug(d => ({ ...d, camera: "✗ Error" }));
+      setPhase("error");
     }
-    return null;
-  }
+  }, []);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CAPTURE PHOTO & MATCH
-  // ─────────────────────────────────────────────────────────────────────────
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  // ── Photo Capture & Feature Matching ──────────────────────────────────────
   const handleCapture = useCallback(async () => {
-    const video = findCameraVideo();
+    const video = videoRef.current;
     const canvas = captureCanvasRef.current;
-    if (!video || !canvas) {
-      console.warn("[Scanner] Camera video element not ready.");
+    if (!video || !canvas || video.videoWidth === 0) {
+      console.warn("[Scanner] Video stream not ready for capture.");
       return;
     }
 
-    // Freeze snapshot
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext("2d")!;
+    // Capture crisp frame at native resolution
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    setCapturedUrl(canvas.toDataURL("image/jpeg", 0.92));
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    setCapturedUrl(dataUrl);
 
     setPhase("analysing");
-    setScanProgress(25);
-    setStatusText("Extracting visual features & color signature…");
+    setScanProgress(30);
+    setStatusText("Analyzing visual patterns & colors…");
 
     const t0 = performance.now();
     const captureData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    // Ensure descriptors are ready
     if (!refDescsRef.current || refDescsRef.current.length === 0) {
       refDescsRef.current = await buildReferenceDescriptors();
     }
 
-    setScanProgress(65);
-    setStatusText("Matching against photo targets…");
+    setScanProgress(75);
+    setStatusText("Matching photo against memories…");
 
     const matches = matchReferenceImages(captureData, refDescsRef.current);
     const ms = Math.round(performance.now() - t0);
@@ -186,7 +207,7 @@ export default function ScannerPage() {
       }
     }
 
-    // No confident match found
+    // No confident match
     console.log("[Scanner] ❌ No confident match found.");
     setPhase("no_match");
     setStatusText("");
@@ -201,7 +222,7 @@ export default function ScannerPage() {
     }));
   }, []);
 
-  // Autoplay video on match
+  // Video Autoplay
   useEffect(() => {
     if (phase === "matched" && matchedTarget && playVideoRef.current) {
       const v = playVideoRef.current;
@@ -232,34 +253,25 @@ export default function ScannerPage() {
 
   const handleStart = useCallback(() => {
     setCameraError(null);
-    setPhase("camera");
-    setIsScanning(true);
-  }, []);
-
-  useEffect(() => () => {
-    setIsScanning(false);
-  }, []);
+    startCamera();
+  }, [startCamera]);
 
   return (
-    <main className="relative w-full min-h-screen bg-[#07030f] overflow-hidden flex flex-col">
+    <main className="relative w-full h-screen min-h-screen bg-black overflow-hidden flex flex-col">
       <canvas ref={captureCanvasRef} className="hidden" />
 
-      {/* Camera feed */}
-      {phase !== "idle" && (
-        <ARScanner
-          isScanning={isScanning}
-          activeTargetIndex={null}
-          isMuted={isMuted}
-          isMockMode={isMock}
-          onTargetFound={() => {}}
-          onTargetLost={() => {}}
-          onCameraError={onCameraError}
-          onSceneReady={onSceneReady}
-          onTelemetryUpdate={onTelemetryUpdate}
-        />
-      )}
+      {/* ── Real Fullscreen Native Camera Video ── */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`fixed inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
+          phase === "camera" ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
 
-      {/* Fullscreen video playback on match */}
+      {/* ── Matched Video Fullscreen Overlay ── */}
       <AnimatePresence>
         {phase === "matched" && matchedTarget && (
           <motion.div
@@ -282,13 +294,13 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* Freeze snapshot during analysis */}
+      {/* ── Snapshot Freeze Frame During Analysis ── */}
       <AnimatePresence>
         {capturedUrl && phase === "analysing" && (
           <motion.img
             key="freeze"
             src={capturedUrl}
-            alt=""
+            alt="Captured photo"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -297,7 +309,7 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* Analyzing spinner overlay */}
+      {/* ── Analysis Spinner ── */}
       <AnimatePresence>
         {phase === "analysing" && (
           <motion.div
@@ -319,14 +331,14 @@ export default function ScannerPage() {
                 className="h-full bg-gradient-to-r from-pink-500 to-amber-400 rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${scanProgress}%` }}
-                transition={{ duration: 0.4 }}
+                transition={{ duration: 0.3 }}
               />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* No match error overlay */}
+      {/* ── No Match Overlay ── */}
       <AnimatePresence>
         {phase === "no_match" && (
           <motion.div
@@ -334,18 +346,18 @@ export default function ScannerPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center gap-4 p-8 text-center overflow-y-auto"
+            className="fixed inset-0 z-40 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center gap-4 p-8 text-center"
           >
             <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center">
               <AlertCircle className="w-9 h-9 text-amber-400" />
             </div>
             <h3 className="text-xl font-bold text-white">Photo not recognised</h3>
             <p className="text-sm text-pink-200/80 max-w-xs leading-relaxed">
-              Make sure the photo fills the frame and is well-lit. Hold steady and try again.
+              Make sure the photo is well-lit and fills the viewfinder frame. Hold steady and try again.
             </p>
             <button
               onClick={handleReset}
-              className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-sm shadow-xl glow-rose active:scale-[0.97] transition-all"
+              className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-sm shadow-xl glow-rose active:scale-[0.97] transition-all cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" /> Try Again
             </button>
@@ -353,7 +365,30 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* Viewfinder frame */}
+      {/* ── Error Overlay ── */}
+      <AnimatePresence>
+        {phase === "error" && (
+          <motion.div
+            key="error"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/90 flex flex-col items-center justify-center p-6 text-center"
+          >
+            <AlertCircle className="w-12 h-12 text-rose-400 mb-3" />
+            <h3 className="text-lg font-bold text-white mb-2">Camera Access Error</h3>
+            <p className="text-xs text-rose-200/80 max-w-sm mb-6">{cameraError}</p>
+            <button
+              onClick={handleStart}
+              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-xs"
+            >
+              Retry Camera
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Viewfinder Overlay ── */}
       <AnimatePresence>
         {phase === "camera" && (
           <motion.div
@@ -363,7 +398,7 @@ export default function ScannerPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-20 pointer-events-none flex items-center justify-center"
           >
-            <div className="relative w-72 h-72 sm:w-80 sm:h-80">
+            <div className="relative w-72 h-72 sm:w-84 sm:h-84">
               <div className="absolute top-0 left-0 w-10 h-10 border-t-[3px] border-l-[3px] border-pink-400 rounded-tl-xl" />
               <div className="absolute top-0 right-0 w-10 h-10 border-t-[3px] border-r-[3px] border-pink-400 rounded-tr-xl" />
               <div className="absolute bottom-0 left-0 w-10 h-10 border-b-[3px] border-l-[3px] border-pink-400 rounded-bl-xl" />
@@ -374,15 +409,20 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* Top navigation & controls */}
+      {/* ── Top Bar ── */}
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 sm:p-5">
-        <Link href="/" className="flex items-center gap-2 px-3.5 py-2 rounded-full glass-panel text-sm font-medium text-pink-200 hover:text-white transition-all backdrop-blur-md">
+        <Link
+          href="/"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-full glass-panel text-sm font-medium text-pink-200 hover:text-white transition-all backdrop-blur-md"
+        >
           <ArrowLeft className="w-4 h-4" /> Home
         </Link>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowDebug(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${showDebug ? "bg-purple-600/60 text-purple-100 border border-purple-400/50" : "glass-panel text-gray-400 hover:text-white"}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+              showDebug ? "bg-purple-600/60 text-purple-100 border border-purple-400/50" : "glass-panel text-gray-400 hover:text-white"
+            }`}
           >
             <Bug className="w-3.5 h-3.5" /> Debug
           </button>
@@ -394,7 +434,9 @@ export default function ScannerPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => setIsMuted(m => !m)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-xs uppercase tracking-wider shadow-lg ${isMuted ? "bg-pink-600 text-white glow-rose animate-bounce" : "bg-emerald-500/80 text-white"}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-xs uppercase tracking-wider shadow-lg cursor-pointer ${
+                  isMuted ? "bg-pink-600 text-white glow-rose animate-bounce" : "bg-emerald-500/80 text-white"
+                }`}
               >
                 {isMuted ? <><VolumeX className="w-4 h-4" />🔊 Sound</> : <><Volume2 className="w-4 h-4" />On</>}
               </motion.button>
@@ -403,7 +445,7 @@ export default function ScannerPage() {
         </div>
       </div>
 
-      {/* Debug panel */}
+      {/* ── Diagnostic Debug Panel ── */}
       <AnimatePresence>
         {showDebug && (
           <motion.div
@@ -417,7 +459,7 @@ export default function ScannerPage() {
               <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Bug className="w-3.5 h-3.5" /> Diagnostic Panel
               </span>
-              <button onClick={() => setShowDebug(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setShowDebug(false)} className="text-gray-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -426,7 +468,7 @@ export default function ScannerPage() {
               <DR label="Ref Matcher"     v={debug.refMatcher}      ok={debug.refMatcher.startsWith("✓")} />
               <div className="my-1.5 border-t border-purple-500/20" />
               <DR label="Detected Target" v={debug.detectedTarget}  ok={debug.detectedTarget !== "NONE"} bold />
-              <DR label="Confidence"      v={debug.confidence}      ok={parseFloat(debug.confidence) > 65} />
+              <DR label="Confidence"      v={debug.confidence}      ok={parseFloat(debug.confidence) > 60} />
               <DR label="Video"           v={debug.video} />
               <DR label="Status"          v={debug.status}          ok={debug.status === "PLAYING"} />
               <div className="my-1.5 border-t border-purple-500/20" />
@@ -447,12 +489,12 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* Bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-10 pt-4 flex flex-col items-center gap-3 bg-gradient-to-t from-black via-[#07030f]/95 to-transparent pointer-events-none">
+      {/* ── Bottom Action Controls ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-10 pt-4 flex flex-col items-center gap-3 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none">
         <div className="pointer-events-auto w-full flex flex-col items-center gap-3 max-w-sm">
           <AnimatePresence mode="wait">
 
-            {/* Landing: Start button */}
+            {/* Landing: Open Camera */}
             {phase === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full">
                 <div className="glass-panel rounded-3xl p-6 border border-pink-500/20 backdrop-blur-xl text-center">
@@ -465,7 +507,7 @@ export default function ScannerPage() {
                   </p>
                   <button
                     onClick={handleStart}
-                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 glow-rose active:scale-[0.98] transition-all"
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 glow-rose active:scale-[0.98] transition-all cursor-pointer"
                   >
                     <Sparkles className="w-5 h-5 text-amber-200" /> OPEN CAMERA
                   </button>
@@ -473,11 +515,11 @@ export default function ScannerPage() {
               </motion.div>
             )}
 
-            {/* Camera live: Shutter button */}
+            {/* Camera Viewfinder: Shutter Button */}
             {phase === "camera" && (
               <motion.div key="shutter" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3">
-                <p className="text-xs text-pink-200/80 font-medium text-center">
-                  Fill the frame with the photo, then tap the button
+                <p className="text-xs text-pink-200/90 font-medium text-center drop-shadow-md">
+                  Frame the photo inside the corners, then tap
                 </p>
                 <button
                   onClick={handleCapture}
@@ -489,7 +531,7 @@ export default function ScannerPage() {
               </motion.div>
             )}
 
-            {/* Matched target card + Scan Again */}
+            {/* Matched State Card */}
             {phase === "matched" && matchedTarget && (
               <motion.div key="matched" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full">
                 <div className="glass-panel rounded-2xl border border-pink-500/40 p-4 backdrop-blur-xl flex items-center justify-between gap-3">
@@ -504,8 +546,11 @@ export default function ScannerPage() {
                       <p className="text-sm font-serif font-bold text-white truncate">{matchedTarget.name}</p>
                     </div>
                   </div>
-                  <button onClick={handleReset} className="shrink-0 px-3 py-2 rounded-xl glass-panel text-xs font-bold text-pink-200 hover:text-white border border-pink-500/30 flex items-center gap-1.5">
-                    <RefreshCw className="w-3.5 h-3.5" /> Scan Again
+                  <button
+                    onClick={handleReset}
+                    className="shrink-0 px-3 py-2 rounded-xl glass-panel text-xs font-bold text-pink-200 hover:text-white border border-pink-500/30 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Scan Another
                   </button>
                 </div>
               </motion.div>
@@ -522,7 +567,9 @@ function DR({ label, v, ok, bold }: { label: string; v: string; ok?: boolean; bo
   return (
     <div className="flex justify-between gap-2">
       <span className="text-gray-400 shrink-0">{label}:</span>
-      <span className={`text-right truncate max-w-[160px] ${bold ? "font-bold " : ""}${ok === true ? "text-emerald-400" : ok === false ? "text-rose-400" : "text-gray-300"}`}>{v}</span>
+      <span className={`text-right truncate max-w-[160px] ${bold ? "font-bold " : ""}${ok === true ? "text-emerald-400" : ok === false ? "text-rose-400" : "text-gray-300"}`}>
+        {v}
+      </span>
     </div>
   );
 }
