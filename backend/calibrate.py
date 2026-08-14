@@ -58,6 +58,9 @@ def run_calibration():
         ("references/birthday/target4_pink_star.png", "birthday"),
         ("references/birthday/pink_star_marker.png", "birthday"),
         ("references/birthday/star_marker.png", "birthday"),
+
+        # Target 5: Friendship Group
+        ("references/group_friends/target5.jpg", "group_friends"),
     ]
 
     import cv2

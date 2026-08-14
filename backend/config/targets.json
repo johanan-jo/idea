@@ -49,6 +49,17 @@
         "references/birthday/star_marker.png"
       ],
       "threshold": 0.78
+    },
+    {
+      "id": "group_friends",
+      "name": "Friendship Group",
+      "video": "/videos/video1.mp4",
+      "mindar_targets": [4],
+      "reference_dir": "references/group_friends",
+      "references": [
+        "references/group_friends/target5.jpg"
+      ],
+      "threshold": 0.78
     }
   ]
 }

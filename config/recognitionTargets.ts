@@ -79,6 +79,19 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     description: "Beach memories with pink glitter star marker",
     previewColor: "from-pink-600 to-purple-600",
   },
+  {
+    id: "group_friends",
+    name: "Friendship Circle",
+    videoUrl: "/videos/video1.mp4",
+    mindarTargetIndices: [4],
+    referenceImages: [
+      "/targets/target5.jpg",
+    ],
+    referenceThreshold: 0.78,
+    badge: "Memory #5",
+    description: "Joyful memories together",
+    previewColor: "from-amber-500 to-rose-600",
+  },
 ];
 
 export const getTargetById = (id: string): RecognitionTarget | undefined =>
