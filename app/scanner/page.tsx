@@ -117,6 +117,36 @@ export default function ScannerPage() {
     return () => clearInterval(interval);
   }, [apiUrl]);
 
+  const [orientationAngle, setOrientationAngle] = useState(0);
+  const [isLandscape,      setIsLandscape]      = useState(false);
+
+  // Orientation Tracking for Stable Ergonomic Shutter Button
+  useEffect(() => {
+    function updateOrientation() {
+      if (typeof window !== "undefined") {
+        const angle = window.screen?.orientation?.angle ?? (typeof window.orientation === "number" ? (window.orientation as number) : 0);
+        setOrientationAngle(angle);
+        const landscape = window.matchMedia("(orientation: landscape)").matches;
+        setIsLandscape(landscape);
+      }
+    }
+
+    updateOrientation();
+    window.addEventListener("orientationchange", updateOrientation);
+    window.addEventListener("resize", updateOrientation);
+    if (window.screen?.orientation) {
+      window.screen.orientation.addEventListener("change", updateOrientation);
+    }
+
+    return () => {
+      window.removeEventListener("orientationchange", updateOrientation);
+      window.removeEventListener("resize", updateOrientation);
+      if (window.screen?.orientation) {
+        window.screen.orientation.removeEventListener("change", updateOrientation);
+      }
+    };
+  }, []);
+
   // Pre-load local fallback descriptors
   useEffect(() => {
     buildReferenceDescriptors()
@@ -603,7 +633,38 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Bottom Action Controls ── */}
+      {/* ── Camera Viewfinder: Orientation-Stable Shutter Button ── */}
+      {phase === "camera" && scanMode === "smart_photo" && (
+        <div
+          className={`fixed z-40 pointer-events-auto transition-all duration-300 ${
+            isLandscape
+              ? "right-6 sm:right-10 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3"
+              : "bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
+          }`}
+        >
+          <motion.p
+            key="hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className={`text-xs text-pink-200/95 font-medium text-center drop-shadow-md tracking-wide px-3 py-1 rounded-full glass-panel border border-pink-500/20 whitespace-nowrap ${
+              isLandscape ? "text-[11px]" : ""
+            }`}
+          >
+            Point at photo, then tap
+          </motion.p>
+          <motion.button
+            key="shutter-btn"
+            onClick={handleCapture}
+            aria-label="Take photo"
+            whileTap={{ scale: 0.88 }}
+            className="w-20 h-20 rounded-full bg-white border-4 border-pink-500/60 shadow-[0_0_30px_rgba(236,72,153,0.5)] flex items-center justify-center cursor-pointer transition-transform"
+          >
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-400" />
+          </motion.button>
+        </div>
+      )}
+
+      {/* ── Bottom Action Controls (Start Card & Matched Info Card) ── */}
       <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-10 pt-4 flex flex-col items-center gap-3 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none">
         <div className="pointer-events-auto w-full flex flex-col items-center gap-3 max-w-sm">
           <AnimatePresence mode="wait">
@@ -626,22 +687,6 @@ export default function ScannerPage() {
                     <Sparkles className="w-5 h-5 text-amber-200" /> OPEN SCANNER
                   </button>
                 </div>
-              </motion.div>
-            )}
-
-            {/* Camera Viewfinder: Shutter Button */}
-            {phase === "camera" && scanMode === "smart_photo" && (
-              <motion.div key="shutter" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3">
-                <p className="text-xs text-pink-200/95 font-medium text-center drop-shadow-md tracking-wide">
-                  Point at any photo (portrait or landscape), then tap
-                </p>
-                <button
-                  onClick={handleCapture}
-                  aria-label="Take photo"
-                  className="w-20 h-20 rounded-full bg-white border-4 border-pink-500/60 shadow-[0_0_30px_rgba(236,72,153,0.5)] flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
-                >
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-400" />
-                </button>
               </motion.div>
             )}
 
