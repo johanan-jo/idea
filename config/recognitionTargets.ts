@@ -56,7 +56,10 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     name: "Spider-Man",
     videoUrl: "/videos/video1.mp4",
     mindarTargetIndices: [0],
-    referenceImages: ["/targets/spiderman_target.jpg"],
+    referenceImages: [
+      "/references/spiderman_marker.png",
+      "/targets/spiderman_target.jpg",
+    ],
     referenceThreshold: 0.72,
     badge: "Memory #0",
     description: "Physical comic book photo brought to life",
