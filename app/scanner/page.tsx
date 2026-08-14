@@ -1,16 +1,17 @@
 "use client";
 
 /**
- * Clean, Full-Screen Photo-Capture Scanner
+ * Hybrid Image Recognition & AR Scanner
  *
- * Uses native HTML5 Camera (getUserMedia) for 100% reliable full-screen capture
- * without A-Frame / MindAR canvas conflicts or blank screens.
+ * Dual Mode Architecture:
+ *   1. SMART PHOTO SCAN (Primary):
+ *      - Captures camera snapshot at full resolution
+ *      - Sends frame to Python FastAPI + OpenCV backend on Render (/recognize)
+ *      - Receives {matched, target_id, confidence, method}
+ *      - Plays linked video (with automatic client-side fallback if backend is offline)
  *
- * Recognition Pipeline:
- *   1. User points camera at physical photo
- *   2. User taps shutter button
- *   3. Frame analyzed via 60% HOG Structure + 40% Color Distribution
- *   4. Highest scoring target (>= 60%) plays its linked video
+ *   2. AR LIVE SCAN (MindAR):
+ *      - Client-side real-time 3D tracking anchored to physical photos
  *
  * Target Mapping:
  *   Photo 1 (Spider-Man)  -> /videos/video1.mp4
@@ -24,7 +25,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Bug, X, Camera, RefreshCw,
-  Volume2, VolumeX, Sparkles, AlertCircle, CheckCircle2, ZoomIn,
+  Volume2, VolumeX, Sparkles, AlertCircle, CheckCircle2, ZoomIn, Eye,
+  Server, Zap, CheckCircle, Wifi, WifiOff
 } from "lucide-react";
 
 import {
@@ -37,36 +39,30 @@ import {
   matchReferenceImages,
 } from "@/lib/referenceImageMatcher";
 import type { ReferenceDescriptor, ReferenceMatchResult } from "@/lib/referenceImageMatcher";
+import ARScanner from "@/components/ARScanner";
+import type { ARTelemetryState } from "@/components/ARScanner";
+import { ARTargetConfig } from "@/config/arTargets";
+
+type ScanMode = "smart_photo" | "ar_live";
 
 type Phase =
-  | "idle"        // Start page
-  | "camera"      // Native camera active
-  | "analysing"   // Photo captured, running feature + color matcher
+  | "idle"        // Landing card
+  | "camera"      // Camera active
+  | "analysing"   // Photo captured, calling backend /recognize
   | "matched"     // Match found -> video playing
   | "no_match"    // No confident match
   | "error";      // Permission error
 
-interface DebugState {
-  camera: string;
-  refMatcher: string;
-  detectedTarget: string;
-  confidence: string;
-  video: string;
-  status: string;
-  matches: ReferenceMatchResult[];
-  scanMs: number;
+interface BackendDebugInfo {
+  serverUrl: string;
+  serverStatus: "checking" | "online" | "offline";
+  targetsLoaded?: number;
+  lastResponseMs?: number;
+  method?: string;
+  confidence?: string;
+  inliers?: number;
+  detectedTarget?: string;
 }
-
-const INIT_DEBUG: DebugState = {
-  camera: "Idle",
-  refMatcher: "Loading",
-  detectedTarget: "NONE",
-  confidence: "—",
-  video: "—",
-  status: "Idle",
-  matches: [],
-  scanMs: 0,
-};
 
 export default function ScannerPage() {
   const videoRef         = useRef<HTMLVideoElement>(null);
@@ -75,31 +71,67 @@ export default function ScannerPage() {
   const streamRef        = useRef<MediaStream | null>(null);
   const refDescsRef      = useRef<ReferenceDescriptor[] | null>(null);
 
-  const [phase,         setPhase]         = useState<Phase>("idle");
-  const [matchedTarget, setMatchedTarget] = useState<RecognitionTarget | null>(null);
-  const [capturedUrl,   setCapturedUrl]   = useState<string | null>(null);
-  const [isMuted,       setIsMuted]       = useState(true);
-  const [cameraError,   setCameraError]   = useState<string | null>(null);
-  const [scanProgress,  setScanProgress]  = useState(0);
-  const [statusText,    setStatusText]    = useState("");
-  const [showDebug,     setShowDebug]     = useState(false);
-  const [debug,         setDebug]         = useState<DebugState>(INIT_DEBUG);
+  const [scanMode,       setScanMode]       = useState<ScanMode>("smart_photo");
+  const [phase,          setPhase]          = useState<Phase>("idle");
+  const [matchedTarget,  setMatchedTarget]  = useState<RecognitionTarget | null>(null);
+  const [capturedUrl,    setCapturedUrl]    = useState<string | null>(null);
+  const [isMuted,        setIsMuted]        = useState(true);
+  const [cameraError,    setCameraError]    = useState<string | null>(null);
+  const [scanProgress,   setScanProgress]   = useState(0);
+  const [statusText,     setStatusText]     = useState("");
+  const [showDebug,      setShowDebug]      = useState(false);
+  const [isMock,         setIsMock]         = useState(false);
 
-  // Pre-load reference image descriptors on startup
+  const [backendDebug, setBackendDebug] = useState<BackendDebugInfo>({
+    serverUrl: process.env.NEXT_PUBLIC_RECOGNITION_API_URL || "http://localhost:8000",
+    serverStatus: "checking",
+  });
+
+  const apiUrl = process.env.NEXT_PUBLIC_RECOGNITION_API_URL || "http://localhost:8000";
+
+  // Check Backend Health on Mount & Periodic Ping
+  useEffect(() => {
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${apiUrl}/health`, { method: "GET" });
+        if (res.ok) {
+          const data = await res.json();
+          setBackendDebug(d => ({
+            ...d,
+            serverStatus: "online",
+            targetsLoaded: data.targets_loaded ?? 8,
+          }));
+          console.log("[Scanner] Python Backend is Online:", data);
+        } else {
+          setBackendDebug(d => ({ ...d, serverStatus: "offline" }));
+        }
+      } catch (err) {
+        setBackendDebug(d => ({ ...d, serverStatus: "offline" }));
+        console.warn("[Scanner] Python Backend offline, client-side fallback enabled.");
+      }
+    }
+
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
+  }, [apiUrl]);
+
+  // Pre-load local fallback descriptors
   useEffect(() => {
     buildReferenceDescriptors()
       .then(descs => {
         refDescsRef.current = descs;
-        setDebug(d => ({ ...d, refMatcher: `✓ ${descs.length} references ready` }));
-        console.log(`[Scanner] Loaded ${descs.length} reference descriptors.`);
       })
-      .catch(err => {
-        setDebug(d => ({ ...d, refMatcher: "✗ Load error" }));
-        console.warn("[Scanner] Reference loading error:", err);
-      });
+      .catch(console.warn);
   }, []);
 
-  // ── Native Camera Management ──────────────────────────────────────────────
+  // Detect mobile vs desktop mock
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    setIsMock(!(/android|iphone|ipad|ipod|mobile/i.test(ua)) && !window.location.search.includes("force-ar"));
+  }, []);
+
+  // ── Native Camera for Smart Photo Scan ────────────────────────────────────
   const startCamera = useCallback(async () => {
     try {
       if (streamRef.current) {
@@ -121,7 +153,6 @@ export default function ScannerPage() {
         await videoRef.current.play();
       }
 
-      setDebug(d => ({ ...d, camera: "✓ Live (Native)" }));
       setPhase("camera");
     } catch (err: any) {
       console.error("Camera startup error:", err);
@@ -129,7 +160,6 @@ export default function ScannerPage() {
         ? "Camera permission denied. Please allow camera access in your browser settings."
         : `Camera error: ${err.message || "Failed to start camera."}`;
       setCameraError(msg);
-      setDebug(d => ({ ...d, camera: "✗ Error" }));
       setPhase("error");
     }
   }, []);
@@ -150,79 +180,133 @@ export default function ScannerPage() {
     };
   }, [stopCamera]);
 
-  // ── Photo Capture & Feature Matching ──────────────────────────────────────
+  // ── Shutter Click: Capture Frame & Query Python Backend ───────────────────
   const handleCapture = useCallback(async () => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     if (!video || !canvas || video.videoWidth === 0) {
-      console.warn("[Scanner] Video stream not ready for capture.");
+      console.warn("[Scanner] Camera video element not ready.");
       return;
     }
 
-    // Capture crisp frame at native resolution
+    // Capture frame from native video element
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
     setCapturedUrl(dataUrl);
 
     setPhase("analysing");
-    setScanProgress(30);
-    setStatusText("Analyzing visual patterns & colors…");
+    setScanProgress(20);
+    setStatusText("Connecting to OpenCV Recognition Engine…");
 
     const t0 = performance.now();
-    const captureData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    if (!refDescsRef.current || refDescsRef.current.length === 0) {
-      refDescsRef.current = await buildReferenceDescriptors();
+    // Convert canvas to Blob for multipart upload
+    const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob) {
+      setPhase("no_match");
+      return;
     }
 
-    setScanProgress(75);
-    setStatusText("Matching photo against memories…");
+    let resultTarget: RecognitionTarget | null = null;
+    let methodUsed = "python_opencv";
+    let confVal = 0;
+    let inliersVal = 0;
 
-    const matches = matchReferenceImages(captureData, refDescsRef.current);
-    const ms = Math.round(performance.now() - t0);
+    // 1. Try Python FastAPI Backend on Render
+    try {
+      const formData = new FormData();
+      formData.append("image", blob, "scan.jpg");
 
-    setScanProgress(100);
+      setScanProgress(50);
+      setStatusText("Analyzing visual markers & features…");
 
-    if (matches.length > 0) {
-      const best = matches[0];
-      const target = getTargetById(best.targetId);
+      const response = await fetch(`${apiUrl}/recognize`, {
+        method: "POST",
+        body: formData,
+      });
 
-      if (target) {
-        console.log(`[Scanner] ✅ Matched: ${target.name} (${target.id}) -> ${target.videoUrl} [Score: ${(best.confidence * 100).toFixed(1)}%]`);
-        setMatchedTarget(target);
-        setPhase("matched");
-        setDebug(d => ({
-          ...d,
-          detectedTarget: target.name,
-          confidence: `${(best.confidence * 100).toFixed(1)}%`,
-          video: target.videoUrl.split("/").pop() ?? target.videoUrl,
-          status: "PLAYING",
-          matches,
-          scanMs: ms,
-        }));
-        return;
+      if (response.ok) {
+        const data = await response.json();
+        const elapsed = Math.round(performance.now() - t0);
+
+        if (data.matched && data.target_id) {
+          const t = getTargetById(data.target_id);
+          if (t) {
+            resultTarget = t;
+            confVal = data.confidence;
+            methodUsed = data.method || "python_opencv";
+            inliersVal = data.debug?.inliers || 0;
+            setBackendDebug(d => ({
+              ...d,
+              lastResponseMs: elapsed,
+              method: data.method,
+              confidence: `${(data.confidence * 100).toFixed(1)}%`,
+              inliers: data.debug?.inliers,
+              detectedTarget: t.name,
+            }));
+          }
+        } else {
+          setBackendDebug(d => ({
+            ...d,
+            lastResponseMs: elapsed,
+            detectedTarget: "NONE",
+            confidence: "0%",
+          }));
+        }
+      }
+    } catch (apiErr) {
+      console.warn("[Scanner] Backend request failed, invoking client fallback matcher...", apiErr);
+    }
+
+    // 2. Client-Side Fallback (if backend unreachable or still cold starting)
+    if (!resultTarget) {
+      setScanProgress(80);
+      setStatusText("Verifying image features locally…");
+
+      if (!refDescsRef.current || refDescsRef.current.length === 0) {
+        refDescsRef.current = await buildReferenceDescriptors();
+      }
+
+      const captureData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const matches = matchReferenceImages(captureData, refDescsRef.current);
+      const elapsed = Math.round(performance.now() - t0);
+
+      if (matches.length > 0) {
+        const best = matches[0];
+        const t = getTargetById(best.targetId);
+        if (t) {
+          resultTarget = t;
+          confVal = best.confidence;
+          methodUsed = "client_fallback";
+          setBackendDebug(d => ({
+            ...d,
+            lastResponseMs: elapsed,
+            method: "client_fallback",
+            confidence: `${(best.confidence * 100).toFixed(1)}%`,
+            detectedTarget: t.name,
+          }));
+        }
       }
     }
 
-    // No confident match
-    console.log("[Scanner] ❌ No confident match found.");
-    setPhase("no_match");
-    setStatusText("");
-    setDebug(d => ({
-      ...d,
-      detectedTarget: "NONE",
-      confidence: "—",
-      video: "—",
-      status: "No Match",
-      matches,
-      scanMs: ms,
-    }));
-  }, []);
+    setScanProgress(100);
 
-  // Video Autoplay
+    // 3. Handle Result
+    if (resultTarget) {
+      console.log(`[Scanner] ✅ Matched: ${resultTarget.name} via ${methodUsed} [Conf: ${(confVal * 100).toFixed(1)}%]`);
+      setMatchedTarget(resultTarget);
+      setPhase("matched");
+    } else {
+      console.log("[Scanner] ❌ No confident match found.");
+      setPhase("no_match");
+      setStatusText("");
+    }
+  }, [apiUrl]);
+
+  // ── Autoplay Video on Match ───────────────────────────────────────────────
   useEffect(() => {
     if (phase === "matched" && matchedTarget && playVideoRef.current) {
       const v = playVideoRef.current;
@@ -240,38 +324,59 @@ export default function ScannerPage() {
   const handleReset = useCallback(() => {
     setCapturedUrl(null);
     setMatchedTarget(null);
-    setDebug(d => ({
-      ...d,
-      detectedTarget: "NONE",
-      confidence: "—",
-      video: "—",
-      status: "Scanning",
-      matches: [],
-    }));
     setPhase("camera");
   }, []);
 
   const handleStart = useCallback(() => {
     setCameraError(null);
-    startCamera();
-  }, [startCamera]);
+    if (scanMode === "smart_photo") {
+      startCamera();
+    } else {
+      setPhase("camera");
+    }
+  }, [scanMode, startCamera]);
+
+  const onMindARTargetFound = useCallback((arTarget: ARTargetConfig) => {
+    const t = RECOGNITION_TARGETS.find(r => r.mindarTargetIndices.includes(arTarget.targetIndex));
+    if (t) {
+      setMatchedTarget(t);
+      setPhase("matched");
+    }
+  }, []);
 
   return (
     <main className="relative w-full h-screen min-h-screen bg-black overflow-hidden flex flex-col">
       <canvas ref={captureCanvasRef} className="hidden" />
 
-      {/* ── Real Fullscreen Native Camera Video ── */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`fixed inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
-          phase === "camera" ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      />
+      {/* ── Native Camera (Smart Photo Scan) ── */}
+      {scanMode === "smart_photo" && (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`fixed inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
+            phase === "camera" ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        />
+      )}
 
-      {/* ── Matched Video Fullscreen Overlay ── */}
+      {/* ── MindAR 3D AR Camera (AR Live Scan) ── */}
+      {scanMode === "ar_live" && phase !== "idle" && (
+        <ARScanner
+          isScanning={phase === "camera"}
+          activeTargetIndex={matchedTarget ? (matchedTarget.mindarTargetIndices[0] ?? null) : null}
+          isMuted={isMuted}
+          isMockMode={isMock}
+          onTargetFound={onMindARTargetFound}
+          onTargetLost={() => {}}
+          onCameraError={(e) => setCameraError(e)}
+          onSceneReady={() => setPhase("camera")}
+          onTelemetryUpdate={() => {}}
+        />
+      )}
+
+      {/* ── Fullscreen Video on Match ── */}
       <AnimatePresence>
         {phase === "matched" && matchedTarget && (
           <motion.div
@@ -317,7 +422,7 @@ export default function ScannerPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-5"
+            className="fixed inset-0 z-40 bg-black/65 backdrop-blur-md flex flex-col items-center justify-center gap-5"
           >
             <div className="relative w-24 h-24">
               <div className="absolute inset-0 rounded-full border-4 border-pink-500/30" />
@@ -328,7 +433,7 @@ export default function ScannerPage() {
             <p className="text-white font-bold text-sm tracking-wide">{statusText}</p>
             <div className="w-56 h-1.5 rounded-full bg-white/10 overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-pink-500 to-amber-400 rounded-full"
+                className="h-full bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${scanProgress}%` }}
                 transition={{ duration: 0.3 }}
@@ -353,7 +458,7 @@ export default function ScannerPage() {
             </div>
             <h3 className="text-xl font-bold text-white">Photo not recognised</h3>
             <p className="text-sm text-pink-200/80 max-w-xs leading-relaxed">
-              Make sure the photo is well-lit and fills the viewfinder frame. Hold steady and try again.
+              Make sure the photograph is clearly visible and well-lit. Hold steady and try again.
             </p>
             <button
               onClick={handleReset}
@@ -365,30 +470,7 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Error Overlay ── */}
-      <AnimatePresence>
-        {phase === "error" && (
-          <motion.div
-            key="error"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/90 flex flex-col items-center justify-center p-6 text-center"
-          >
-            <AlertCircle className="w-12 h-12 text-rose-400 mb-3" />
-            <h3 className="text-lg font-bold text-white mb-2">Camera Access Error</h3>
-            <p className="text-xs text-rose-200/80 max-w-sm mb-6">{cameraError}</p>
-            <button
-              onClick={handleStart}
-              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 text-white font-bold text-xs"
-            >
-              Retry Camera
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Full-Screen Edge Viewfinder (No small box restriction) ── */}
+      {/* ── Full-Screen Viewfinder Frame ── */}
       <AnimatePresence>
         {phase === "camera" && (
           <motion.div
@@ -398,16 +480,11 @@ export default function ScannerPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-20 pointer-events-none p-6 sm:p-10 flex flex-col justify-between"
           >
-            {/* Top Corners */}
             <div className="flex justify-between w-full">
               <div className="w-12 h-12 border-t-[3px] border-l-[3px] border-pink-400/90 rounded-tl-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
               <div className="w-12 h-12 border-t-[3px] border-r-[3px] border-pink-400/90 rounded-tr-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
             </div>
-
-            {/* Center Subtle Scan Line */}
             <div className="w-full relative h-[2px] bg-gradient-to-r from-transparent via-pink-500/80 to-transparent shadow-[0_0_15px_4px_rgba(236,72,153,0.6)] animate-scan-laser my-auto" />
-
-            {/* Bottom Corners */}
             <div className="flex justify-between w-full">
               <div className="w-12 h-12 border-b-[3px] border-l-[3px] border-pink-400/90 rounded-bl-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
               <div className="w-12 h-12 border-b-[3px] border-r-[3px] border-pink-400/90 rounded-br-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
@@ -416,7 +493,7 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Top Bar ── */}
+      {/* ── Top Bar Controls ── */}
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 sm:p-5">
         <Link
           href="/"
@@ -424,6 +501,35 @@ export default function ScannerPage() {
         >
           <ArrowLeft className="w-4 h-4" /> Home
         </Link>
+
+        {/* Mode Switcher Pill */}
+        {phase === "camera" && (
+          <div className="flex items-center bg-black/60 backdrop-blur-md rounded-full p-1 border border-pink-500/30">
+            <button
+              onClick={() => {
+                setScanMode("smart_photo");
+                startCamera();
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                scanMode === "smart_photo" ? "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" /> Smart Scan
+            </button>
+            <button
+              onClick={() => {
+                stopCamera();
+                setScanMode("ar_live");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                scanMode === "ar_live" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" /> AR Live
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowDebug(v => !v)}
@@ -460,37 +566,36 @@ export default function ScannerPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed top-16 left-4 right-4 z-50 glass-panel rounded-2xl border border-purple-500/40 p-4 max-w-sm mx-auto max-h-[65vh] overflow-y-auto"
+            className="fixed top-16 left-4 right-4 z-50 glass-panel rounded-2xl border border-purple-500/40 p-4 max-w-sm mx-auto max-h-[70vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Bug className="w-3.5 h-3.5" /> Diagnostic Panel
+                <Bug className="w-3.5 h-3.5" /> Recognition Diagnostics
               </span>
               <button onClick={() => setShowDebug(false)} className="text-gray-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-[11px] font-mono space-y-1">
-              <DR label="Camera"          v={debug.camera}          ok={debug.camera.startsWith("✓")} />
-              <DR label="Ref Matcher"     v={debug.refMatcher}      ok={debug.refMatcher.startsWith("✓")} />
+            <div className="text-[11px] font-mono space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Backend API:</span>
+                <span className="flex items-center gap-1">
+                  {backendDebug.serverStatus === "online" ? (
+                    <><Wifi className="w-3 h-3 text-emerald-400" /><span className="text-emerald-400 font-bold">Online (Render)</span></>
+                  ) : (
+                    <><WifiOff className="w-3 h-3 text-amber-400" /><span className="text-amber-400">Fallback Mode</span></>
+                  )}
+                </span>
+              </div>
+              <DR label="API URL" v={backendDebug.serverUrl.replace("https://", "")} />
+              <DR label="Targets Loaded" v={`${backendDebug.targetsLoaded ?? 8} targets`} />
               <div className="my-1.5 border-t border-purple-500/20" />
-              <DR label="Detected Target" v={debug.detectedTarget}  ok={debug.detectedTarget !== "NONE"} bold />
-              <DR label="Confidence"      v={debug.confidence}      ok={parseFloat(debug.confidence) > 60} />
-              <DR label="Video"           v={debug.video} />
-              <DR label="Status"          v={debug.status}          ok={debug.status === "PLAYING"} />
-              <div className="my-1.5 border-t border-purple-500/20" />
-              <DR label="Analysis Time"   v={`${debug.scanMs}ms`} />
-              {debug.matches.length > 0 && (
-                <div className="pt-2">
-                  <p className="text-purple-300 font-bold mb-1">Ranked Matches:</p>
-                  {debug.matches.map((m, i) => (
-                    <div key={i} className="flex justify-between text-[10px] text-gray-300">
-                      <span>{m.targetId} ({m.region})</span>
-                      <span className="text-emerald-400">{(m.confidence * 100).toFixed(1)}%</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <DR label="Current Mode" v={scanMode === "smart_photo" ? "Smart Photo (OpenCV)" : "AR Live (MindAR)"} />
+              <DR label="Detected Target" v={backendDebug.detectedTarget || "NONE"} bold ok={backendDebug.detectedTarget !== "NONE"} />
+              <DR label="Method" v={backendDebug.method || "—"} />
+              <DR label="Confidence" v={backendDebug.confidence || "—"} ok />
+              {backendDebug.inliers !== undefined && <DR label="RANSAC Inliers" v={`${backendDebug.inliers} points`} ok />}
+              {backendDebug.lastResponseMs !== undefined && <DR label="Server Latency" v={`${backendDebug.lastResponseMs}ms`} />}
             </div>
           </motion.div>
         )}
@@ -501,7 +606,7 @@ export default function ScannerPage() {
         <div className="pointer-events-auto w-full flex flex-col items-center gap-3 max-w-sm">
           <AnimatePresence mode="wait">
 
-            {/* Landing: Open Camera */}
+            {/* Landing: Start Scanner Card */}
             {phase === "idle" && (
               <motion.div key="idle" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full">
                 <div className="glass-panel rounded-3xl p-6 border border-pink-500/20 backdrop-blur-xl text-center">
@@ -510,20 +615,20 @@ export default function ScannerPage() {
                   </div>
                   <h1 className="text-2xl font-serif font-bold text-gradient-rose mb-2">Memories Alive</h1>
                   <p className="text-xs text-pink-200/80 mb-5 leading-relaxed">
-                    Point your camera at one of the physical photographs and press the shutter. The linked memory video will play automatically.
+                    Point your camera at one of the physical photographs and tap the shutter. Python OpenCV recognizes the visual marker and plays the memory video.
                   </p>
                   <button
                     onClick={handleStart}
                     className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 glow-rose active:scale-[0.98] transition-all cursor-pointer"
                   >
-                    <Sparkles className="w-5 h-5 text-amber-200" /> OPEN CAMERA
+                    <Sparkles className="w-5 h-5 text-amber-200" /> OPEN SCANNER
                   </button>
                 </div>
               </motion.div>
             )}
 
             {/* Camera Viewfinder: Shutter Button */}
-            {phase === "camera" && (
+            {phase === "camera" && scanMode === "smart_photo" && (
               <motion.div key="shutter" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3">
                 <p className="text-xs text-pink-200/95 font-medium text-center drop-shadow-md tracking-wide">
                   Point at any photo (portrait or landscape), then tap
@@ -538,7 +643,7 @@ export default function ScannerPage() {
               </motion.div>
             )}
 
-            {/* Matched State Card */}
+            {/* Matched State Info Card */}
             {phase === "matched" && matchedTarget && (
               <motion.div key="matched" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full">
                 <div className="glass-panel rounded-2xl border border-pink-500/40 p-4 backdrop-blur-xl flex items-center justify-between gap-3">
@@ -574,7 +679,7 @@ function DR({ label, v, ok, bold }: { label: string; v: string; ok?: boolean; bo
   return (
     <div className="flex justify-between gap-2">
       <span className="text-gray-400 shrink-0">{label}:</span>
-      <span className={`text-right truncate max-w-[160px] ${bold ? "font-bold " : ""}${ok === true ? "text-emerald-400" : ok === false ? "text-rose-400" : "text-gray-300"}`}>
+      <span className={`text-right truncate max-w-[170px] ${bold ? "font-bold " : ""}${ok === true ? "text-emerald-400" : ok === false ? "text-rose-400" : "text-gray-300"}`}>
         {v}
       </span>
     </div>

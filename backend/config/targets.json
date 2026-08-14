@@ -1,0 +1,48 @@
+{
+  "targets": [
+    {
+      "id": "spiderman",
+      "name": "Spider-Man",
+      "video": "/videos/video1.mp4",
+      "mindar_targets": [0],
+      "references": [
+        "spiderman_target.jpg",
+        "spiderman_marker.png"
+      ],
+      "threshold": 0.75
+    },
+    {
+      "id": "saibaba",
+      "name": "Sai Baba",
+      "video": "/videos/video2.mp4",
+      "mindar_targets": [1],
+      "references": [
+        "target2.jpg"
+      ],
+      "threshold": 0.75
+    },
+    {
+      "id": "girls_thumbsup",
+      "name": "Thumbs Up Memories",
+      "video": "/videos/video3.mp4",
+      "mindar_targets": [2],
+      "references": [
+        "target3.jpg",
+        "thumbs_up.png"
+      ],
+      "threshold": 0.75
+    },
+    {
+      "id": "birthday",
+      "name": "Beach Celebration",
+      "video": "/videos/video4.mp4",
+      "mindar_targets": [3],
+      "references": [
+        "target4.jpg",
+        "pink_star_marker.png",
+        "star_marker.png"
+      ],
+      "threshold": 0.75
+    }
+  ]
+}
