@@ -1,23 +1,19 @@
 "use client";
 
 /**
- * Hybrid Image Recognition & AR Scanner
+ * Smart Photo Scan — Image Recognition Scanner
  *
- * Dual Mode Architecture:
- *   1. SMART PHOTO SCAN (Primary):
- *      - Captures camera snapshot at full resolution
- *      - Sends frame to Python FastAPI + OpenCV backend on Render (/recognize)
- *      - Receives {matched, target_id, confidence, method}
- *      - Plays linked video (with automatic client-side fallback if backend is offline)
- *
- *   2. AR LIVE SCAN (MindAR):
- *      - Client-side real-time 3D tracking anchored to physical photos
+ *   - Captures camera snapshot at full resolution
+ *   - Sends frame to Python FastAPI + OpenCV/MobileNetV3 backend on Render (/recognize)
+ *   - Receives {matched, target_id, confidence, method}
+ *   - Plays linked video (with automatic client-side fallback if backend is offline)
  *
  * Target Mapping:
- *   Photo 1 (Spider-Man)  -> /videos/video1.mp4
- *   Photo 2 (Sai Baba)    -> /videos/video2.mp4
- *   Photo 3 (Girls + 👍)  -> /videos/video3.mp4
- *   Photo 4 (Birthday)    -> /videos/video4.mp4
+ *   Photo 1 (Spider-Man)      -> /videos/video1.mp4
+ *   Photo 2 (Sai Baba)        -> /videos/video2.mp4
+ *   Photo 3 (Girls + 👍)      -> /videos/video3.mp4
+ *   Photo 4 (Birthday)        -> /videos/video4.mp4
+ *   Photo 5 (Friendship Group) -> /videos/video1.mp4
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -25,8 +21,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Bug, X, Camera, RefreshCw,
-  Volume2, VolumeX, Sparkles, AlertCircle, CheckCircle2, ZoomIn, Eye,
-  Server, Zap, CheckCircle, Wifi, WifiOff
+  Volume2, VolumeX, Sparkles, AlertCircle, CheckCircle2,
+  Zap, Wifi, WifiOff
 } from "lucide-react";
 
 import {
@@ -39,11 +35,8 @@ import {
   matchReferenceImages,
 } from "@/lib/referenceImageMatcher";
 import type { ReferenceDescriptor, ReferenceMatchResult } from "@/lib/referenceImageMatcher";
-import ARScanner from "@/components/ARScanner";
-import type { ARTelemetryState } from "@/components/ARScanner";
-import { ARTargetConfig } from "@/config/arTargets";
 
-type ScanMode = "smart_photo" | "ar_live";
+
 
 type Phase =
   | "idle"        // Landing card
@@ -72,7 +65,7 @@ export default function ScannerPage() {
   const streamRef        = useRef<MediaStream | null>(null);
   const refDescsRef      = useRef<ReferenceDescriptor[] | null>(null);
 
-  const [scanMode,       setScanMode]       = useState<ScanMode>("smart_photo");
+
   const [phase,          setPhase]          = useState<Phase>("idle");
   const [matchedTarget,  setMatchedTarget]  = useState<RecognitionTarget | null>(null);
   const [capturedUrl,    setCapturedUrl]    = useState<string | null>(null);
@@ -156,11 +149,7 @@ export default function ScannerPage() {
       .catch(console.warn);
   }, []);
 
-  // Detect mobile vs desktop mock
-  useEffect(() => {
-    const ua = navigator.userAgent.toLowerCase();
-    setIsMock(!(/android|iphone|ipad|ipod|mobile/i.test(ua)) && !window.location.search.includes("force-ar"));
-  }, []);
+
 
   // ── Native Camera for Smart Photo Scan ────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -361,52 +350,23 @@ export default function ScannerPage() {
 
   const handleStart = useCallback(() => {
     setCameraError(null);
-    if (scanMode === "smart_photo") {
-      startCamera();
-    } else {
-      setPhase("camera");
-    }
-  }, [scanMode, startCamera]);
-
-  const onMindARTargetFound = useCallback((arTarget: ARTargetConfig) => {
-    const t = RECOGNITION_TARGETS.find(r => r.mindarTargetIndices.includes(arTarget.targetIndex));
-    if (t) {
-      setMatchedTarget(t);
-      setPhase("matched");
-    }
-  }, []);
+    startCamera();
+  }, [startCamera]);
 
   return (
     <main className="relative w-full h-screen min-h-screen bg-black overflow-hidden flex flex-col">
       <canvas ref={captureCanvasRef} className="hidden" />
 
       {/* ── Native Camera (Smart Photo Scan) ── */}
-      {scanMode === "smart_photo" && (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`fixed inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
-            phase === "camera" ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        />
-      )}
-
-      {/* ── MindAR 3D AR Camera (AR Live Scan) ── */}
-      {scanMode === "ar_live" && phase !== "idle" && (
-        <ARScanner
-          isScanning={phase === "camera"}
-          activeTargetIndex={matchedTarget ? (matchedTarget.mindarTargetIndices[0] ?? null) : null}
-          isMuted={isMuted}
-          isMockMode={isMock}
-          onTargetFound={onMindARTargetFound}
-          onTargetLost={() => {}}
-          onCameraError={(e) => setCameraError(e)}
-          onSceneReady={() => setPhase("camera")}
-          onTelemetryUpdate={() => {}}
-        />
-      )}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`fixed inset-0 w-full h-full object-cover z-10 transition-opacity duration-300 ${
+          phase === "camera" ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
 
       {/* ── Fullscreen Video on Match ── */}
       <AnimatePresence>
@@ -460,7 +420,7 @@ export default function ScannerPage() {
               <div className="absolute inset-0 rounded-full border-4 border-pink-500/30" />
               <div className="absolute inset-0 rounded-full border-4 border-t-pink-400 border-r-rose-400 border-b-transparent border-l-transparent animate-spin" />
               <div className="absolute inset-2 rounded-full border-2 border-amber-400/40 animate-spin" style={{ animationDirection: "reverse", animationDuration: "1.4s" }} />
-              <ZoomIn className="absolute inset-0 m-auto w-8 h-8 text-pink-300 animate-pulse" />
+              <Camera className="absolute inset-0 m-auto w-8 h-8 text-pink-300 animate-pulse" />
             </div>
             <p className="text-white font-bold text-sm tracking-wide">{statusText}</p>
             <div className="w-56 h-1.5 rounded-full bg-white/10 overflow-hidden">
@@ -534,33 +494,6 @@ export default function ScannerPage() {
           <ArrowLeft className="w-4 h-4" /> Home
         </Link>
 
-        {/* Mode Switcher Pill */}
-        {phase === "camera" && (
-          <div className="flex items-center bg-black/60 backdrop-blur-md rounded-full p-1 border border-pink-500/30">
-            <button
-              onClick={() => {
-                setScanMode("smart_photo");
-                startCamera();
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                scanMode === "smart_photo" ? "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" /> Smart Scan
-            </button>
-            <button
-              onClick={() => {
-                stopCamera();
-                setScanMode("ar_live");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                scanMode === "ar_live" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5" /> AR Live
-            </button>
-          </div>
-        )}
 
         <div className="flex items-center gap-2">
           <button
@@ -622,7 +555,7 @@ export default function ScannerPage() {
               <DR label="API URL" v={backendDebug.serverUrl.replace("https://", "")} />
               <DR label="Targets Loaded" v={`${backendDebug.targetsLoaded ?? 8} targets`} />
               <div className="my-1.5 border-t border-purple-500/20" />
-              <DR label="Current Mode" v={scanMode === "smart_photo" ? "Smart Photo (OpenCV)" : "AR Live (MindAR)"} />
+              <DR label="Current Mode" v="Smart Photo (OpenCV/MobileNetV3)" />
               <DR label="Detected Target" v={backendDebug.detectedTarget || "NONE"} bold ok={backendDebug.detectedTarget !== "NONE"} />
               <DR label="Method" v={backendDebug.method || "—"} />
               <DR label="Confidence" v={backendDebug.confidence || "—"} ok />
@@ -634,7 +567,7 @@ export default function ScannerPage() {
       </AnimatePresence>
 
       {/* ── Camera Viewfinder: Orientation-Stable Shutter Button ── */}
-      {phase === "camera" && scanMode === "smart_photo" && (
+      {phase === "camera" && (
         <div
           className={`fixed z-40 pointer-events-auto transition-all duration-300 ${
             isLandscape
