@@ -1,18 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // referenceImageMatcher.ts
 //
-// Robust Visual Feature + Color Hybrid Matcher.
-// Works entirely in the browser using HTML5 Canvas — zero heavy dependencies.
+// Robust Visual Feature + Color Hybrid Matcher with 360° Rotation Invariance.
+// Works across the ENTIRE captured frame (horizontal & vertical orientations).
 //
-// Algorithm:
-//   • 60% Multi-scale HOG (Histogram of Oriented Gradients) - Structure & Edges
-//   • 40% Color Distribution Histogram (RGB 24 bins) - Chromatic Signature
-//   • Multi-region sampling (Full frame, 80% center, 60% center, 4 quadrants)
-//
-// Invariance:
-//   • Lighting invariant (HOG gradient normalization + relative color distribution)
-//   • Scale invariant (multi-region crop checks)
-//   • Background noise resilient
+// Features:
+//   • 60% Multi-scale HOG Structure + 40% Color Distribution Histogram
+//   • Full-frame + Multi-region sampling (Entire capture, 85% center, 65% center, 4 quadrants)
+//   • 4-Way Rotation Invariance (0°, 90°, 180°, 270°) for portrait & landscape scans
+//   • Scale & Lighting invariant
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -129,11 +125,12 @@ function bhattacharyya(a: Float32Array, b: Float32Array): number {
   return Math.max(0, Math.min(1, score / 3)); // 3 channels
 }
 
-// ── Canvas helper ─────────────────────────────────────────────────────────────
+// ── Canvas Helpers with Rotation Support ─────────────────────────────────────
 
-function cropToCanvas(
+function cropAndRotateCanvas(
   src: ImageData,
-  x: number, y: number, w: number, h: number
+  x: number, y: number, w: number, h: number,
+  rotationDeg: number = 0
 ): ImageData {
   const srcC = document.createElement("canvas");
   srcC.width = src.width;
@@ -143,8 +140,17 @@ function cropToCanvas(
   const dstC = document.createElement("canvas");
   dstC.width = HOG_SIZE;
   dstC.height = HOG_SIZE;
-  dstC.getContext("2d")!.drawImage(srcC, x, y, w, h, 0, 0, HOG_SIZE, HOG_SIZE);
-  return dstC.getContext("2d")!.getImageData(0, 0, HOG_SIZE, HOG_SIZE);
+  const ctx = dstC.getContext("2d")!;
+
+  if (rotationDeg !== 0) {
+    ctx.translate(HOG_SIZE / 2, HOG_SIZE / 2);
+    ctx.rotate((rotationDeg * Math.PI) / 180);
+    ctx.drawImage(srcC, x, y, w, h, -HOG_SIZE / 2, -HOG_SIZE / 2, HOG_SIZE, HOG_SIZE);
+  } else {
+    ctx.drawImage(srcC, x, y, w, h, 0, 0, HOG_SIZE, HOG_SIZE);
+  }
+
+  return ctx.getImageData(0, 0, HOG_SIZE, HOG_SIZE);
 }
 
 function imageDataFromUrl(url: string): Promise<ImageData> {
@@ -202,16 +208,31 @@ export function matchReferenceImages(
   const W = captureData.width;
   const H = captureData.height;
 
-  // Multi-region sampling for robust detection across distance/crops
-  const regions: Array<{ name: string; data: ImageData }> = [
-    { name: "full",         data: cropToCanvas(captureData, 0, 0, W, H) },
-    { name: "center80",     data: cropToCanvas(captureData, W * 0.1, H * 0.1, W * 0.8, H * 0.8) },
-    { name: "center60",     data: cropToCanvas(captureData, W * 0.2, H * 0.2, W * 0.6, H * 0.6) },
-    { name: "top-left",     data: cropToCanvas(captureData, 0, 0, W * 0.6, H * 0.6) },
-    { name: "top-right",    data: cropToCanvas(captureData, W * 0.4, 0, W * 0.6, H * 0.6) },
-    { name: "bottom-left",  data: cropToCanvas(captureData, 0, H * 0.4, W * 0.6, H * 0.6) },
-    { name: "bottom-right", data: cropToCanvas(captureData, W * 0.4, H * 0.4, W * 0.6, H * 0.6) },
+  // Multi-region and multi-orientation sampling across the whole captured frame
+  const regions: Array<{ name: string; data: ImageData }> = [];
+
+  // Base spatial crop regions across the entire photo
+  const cropBoxes = [
+    { name: "full",         x: 0,       y: 0,       w: W,        h: H },
+    { name: "center85",     x: W * 0.075, y: H * 0.075, w: W * 0.85, h: H * 0.85 },
+    { name: "center65",     x: W * 0.175, y: H * 0.175, w: W * 0.65, h: H * 0.65 },
+    { name: "top-left",     x: 0,       y: 0,       w: W * 0.65, h: H * 0.65 },
+    { name: "top-right",    x: W * 0.35, y: 0,       w: W * 0.65, h: H * 0.65 },
+    { name: "bottom-left",  x: 0,       y: H * 0.35, w: W * 0.65, h: H * 0.65 },
+    { name: "bottom-right", x: W * 0.35, y: H * 0.35, w: W * 0.65, h: H * 0.65 },
   ];
+
+  // Test across all 4 orientations (0°, 90°, 180°, 270°) for full portrait & landscape invariance
+  const rotations = [0, 90, 180, 270];
+
+  for (const box of cropBoxes) {
+    for (const rot of rotations) {
+      regions.push({
+        name: `${box.name}@${rot}°`,
+        data: cropAndRotateCanvas(captureData, box.x, box.y, box.w, box.h, rot),
+      });
+    }
+  }
 
   const regionDescs = regions.map(r => ({
     name: r.name,

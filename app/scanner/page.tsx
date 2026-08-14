@@ -388,7 +388,7 @@ export default function ScannerPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Viewfinder Overlay ── */}
+      {/* ── Full-Screen Edge Viewfinder (No small box restriction) ── */}
       <AnimatePresence>
         {phase === "camera" && (
           <motion.div
@@ -396,14 +396,21 @@ export default function ScannerPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-20 pointer-events-none flex items-center justify-center"
+            className="fixed inset-0 z-20 pointer-events-none p-6 sm:p-10 flex flex-col justify-between"
           >
-            <div className="relative w-72 h-72 sm:w-84 sm:h-84">
-              <div className="absolute top-0 left-0 w-10 h-10 border-t-[3px] border-l-[3px] border-pink-400 rounded-tl-xl" />
-              <div className="absolute top-0 right-0 w-10 h-10 border-t-[3px] border-r-[3px] border-pink-400 rounded-tr-xl" />
-              <div className="absolute bottom-0 left-0 w-10 h-10 border-b-[3px] border-l-[3px] border-pink-400 rounded-bl-xl" />
-              <div className="absolute bottom-0 right-0 w-10 h-10 border-b-[3px] border-r-[3px] border-pink-400 rounded-br-xl" />
-              <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-pink-500 to-transparent shadow-[0_0_12px_4px_rgba(236,72,153,0.7)] animate-scan-laser" />
+            {/* Top Corners */}
+            <div className="flex justify-between w-full">
+              <div className="w-12 h-12 border-t-[3px] border-l-[3px] border-pink-400/90 rounded-tl-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
+              <div className="w-12 h-12 border-t-[3px] border-r-[3px] border-pink-400/90 rounded-tr-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
+            </div>
+
+            {/* Center Subtle Scan Line */}
+            <div className="w-full relative h-[2px] bg-gradient-to-r from-transparent via-pink-500/80 to-transparent shadow-[0_0_15px_4px_rgba(236,72,153,0.6)] animate-scan-laser my-auto" />
+
+            {/* Bottom Corners */}
+            <div className="flex justify-between w-full">
+              <div className="w-12 h-12 border-b-[3px] border-l-[3px] border-pink-400/90 rounded-bl-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
+              <div className="w-12 h-12 border-b-[3px] border-r-[3px] border-pink-400/90 rounded-br-2xl shadow-[0_0_10px_rgba(244,114,182,0.5)]" />
             </div>
           </motion.div>
         )}
@@ -518,8 +525,8 @@ export default function ScannerPage() {
             {/* Camera Viewfinder: Shutter Button */}
             {phase === "camera" && (
               <motion.div key="shutter" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3">
-                <p className="text-xs text-pink-200/90 font-medium text-center drop-shadow-md">
-                  Frame the photo inside the corners, then tap
+                <p className="text-xs text-pink-200/95 font-medium text-center drop-shadow-md tracking-wide">
+                  Point at any photo (portrait or landscape), then tap
                 </p>
                 <button
                   onClick={handleCapture}
