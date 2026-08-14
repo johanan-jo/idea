@@ -21,6 +21,7 @@ import {
   getTargetByMindarIndex,
   AGREEMENT_BONUS,
   FALLBACK_COLOR_THRESHOLD,
+  DEFAULT_REFERENCE_THRESHOLD,
 } from "@/config/recognitionTargets";
 
 import type { ReferenceMatchResult } from "@/lib/referenceImageMatcher";
@@ -60,7 +61,7 @@ export interface EngineOptions {
 // ── Confidence thresholds ─────────────────────────────────────────────────────
 
 const MINDAR_CONFIDENCE     = 0.95; // MindAR hardware tracking — always high confidence
-const REFERENCE_MIN         = 0.70; // Minimum HOG similarity to consider reference match
+const REFERENCE_MIN         = DEFAULT_REFERENCE_THRESHOLD; // 0.65
 const COLOR_MIN_SCORE       = FALLBACK_COLOR_THRESHOLD; // 0–100
 
 // ── Engine ────────────────────────────────────────────────────────────────────
