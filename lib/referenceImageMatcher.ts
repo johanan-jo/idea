@@ -261,9 +261,19 @@ export function matchReferenceImages(
     }
   }
 
-  // Sort best-first, remove duplicate targetIds (keep best confidence per target)
+  // Sort best-first, deduplicate by targetId (keep best confidence per target)
   const seen = new Set<string>();
-  return results
+  const ranked = results
     .sort((a, b) => b.confidence - a.confidence)
     .filter(r => { if (seen.has(r.targetId)) return false; seen.add(r.targetId); return true; });
+
+  // Require minimum confidence gap between 1st and 2nd place.
+  // If two different targets score too similarly, refuse to guess.
+  const MIN_GAP = 0.06;
+  if (ranked.length >= 2 && ranked[0].confidence - ranked[1].confidence < MIN_GAP) {
+    console.log(`[RefMatcher] Ambiguous — gap too small (${(ranked[0].confidence - ranked[1].confidence).toFixed(3)} < ${MIN_GAP}). Rejecting.`);
+    return [];
+  }
+
+  return ranked;
 }

@@ -78,12 +78,9 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     name: "Beach Sunset",
     videoUrl: "/videos/video3.mp4",
     mindarTargetIndices: [2],
-    // image3 (girls photo) + thumbs-up marker → video3
-    referenceImages: [
-      "/references/thumbs_up.png",  // the marker placed on the physical photo
-      "/targets/target3.jpg",       // the full photo itself (fallback)
-    ],
-    referenceThreshold: 0.65,       // slightly lower — thumbs-up is a distinctive HOG shape
+    // Only the thumbs-up marker image — NOT the full photo (too generic, causes false matches)
+    referenceImages: ["/references/thumbs_up.png"],
+    referenceThreshold: 0.76,   // thumbs-up has a very distinct HOG shape; needs a confident match
     badge: "Memory #2",
     description: "Girls with thumbs up",
     previewColor: "from-amber-400 to-rose-500",
