@@ -71,12 +71,13 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     mindarTargetIndices: [3],
     referenceImages: [
       "/targets/target4.jpg",
+      "/references/pink_star_marker.png",
       "/references/star_marker.png",
     ],
     referenceThreshold: 0.78,
     badge: "Memory #4",
-    description: "Beach memories with yellow star marker",
-    previewColor: "from-purple-500 to-amber-500",
+    description: "Beach memories with pink glitter star marker",
+    previewColor: "from-pink-600 to-purple-600",
   },
 ];
 
