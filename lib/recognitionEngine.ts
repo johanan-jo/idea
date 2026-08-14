@@ -23,6 +23,8 @@ import {
   FALLBACK_COLOR_THRESHOLD,
 } from "@/config/recognitionTargets";
 
+import type { ReferenceMatchResult } from "@/lib/referenceImageMatcher";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type RecognitionMethod = "mindar" | "reference" | "color" | "none";
@@ -69,7 +71,7 @@ export class RecognitionEngine {
 
   // Pending results from each method (hold latest, combine in flush)
   private pendingMindar: { targetIndex: number; ts: number } | null = null;
-  private pendingReference: import("@/lib/referenceImageMatcher").ReferenceMatchResult | null = null;
+  private pendingReference: ReferenceMatchResult | null = null;
   private pendingColor: { targetIndex: number; score: number } | null = null;
 
   // Staleness window — results older than this are ignored in decision
@@ -96,7 +98,7 @@ export class RecognitionEngine {
 
   /** Call with reference matcher results */
   ingestReferenceResult(
-    result: import("@/lib/referenceImageMatcher").ReferenceMatchResult | null
+    result: ReferenceMatchResult | null
   ): void {
     this.pendingReference = result;
     this.decide();
