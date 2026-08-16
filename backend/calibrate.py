@@ -58,6 +58,9 @@ def run_calibration():
 
         # Target 5: Shriya's Wish
         ("references/group_friends/target5.jpg", "group_friends"),
+
+        # Target 6: Thishi's Wish
+        ("references/thishi/target6.jpg", "thishi"),
     ]
 
     import cv2

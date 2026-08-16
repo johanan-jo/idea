@@ -57,6 +57,17 @@
         "references/group_friends/target5.jpg"
       ],
       "threshold": 0.78
+    },
+    {
+      "id": "thishi",
+      "name": "Thishi's Wish",
+      "video": "/videos/thishi wish.mp4",
+      "mindar_targets": [5],
+      "reference_dir": "references/thishi",
+      "references": [
+        "references/thishi/target6.jpg"
+      ],
+      "threshold": 0.78
     }
   ]
 }
