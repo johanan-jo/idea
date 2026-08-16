@@ -87,11 +87,11 @@ export default function SurprisePage() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif font-bold text-gradient-gold mb-3">
-            Your Birthday Wish
+            Happppyyyyyyyyyyyyy Birthdayyyyyyyyyyyyy Ajitha❤️✨
           </h1>
 
           <p className="text-sm text-amber-100/90 leading-relaxed font-light mb-8 max-w-md">
-            "To more adventures, quiet sunsets, starlit walks, and memories that linger forever."
+            You&apos;ve seen a little of what we&apos;ve shared so far. But there&apos;s still so much more to come, more laughter, more memories, and more moments that we&apos;ll one day look back on and smile.
           </p>
 
           <button
