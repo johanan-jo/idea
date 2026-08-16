@@ -91,17 +91,17 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     previewColor: "from-amber-500 to-rose-600",
   },
   {
-    id: "thishi",
-    name: "Thishi's Wish",
-    videoUrl: "/videos/thishi wish.mp4",
+    id: "sv_wish",
+    name: "SV's Wish",
+    videoUrl: "/videos/sv wish.mp4",
     mindarTargetIndices: [5],
     referenceImages: [
       "/targets/target6.jpg",
     ],
     referenceThreshold: 0.78,
     badge: "Memory #6",
-    description: "Thishi's special memory",
-    previewColor: "from-violet-500 to-pink-600",
+    description: "SV's special memory",
+    previewColor: "from-sky-500 to-indigo-600",
   },
 ];
 

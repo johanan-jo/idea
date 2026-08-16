@@ -59,13 +59,13 @@
       "threshold": 0.78
     },
     {
-      "id": "thishi",
-      "name": "Thishi's Wish",
-      "video": "/videos/thishi wish.mp4",
+      "id": "sv_wish",
+      "name": "SV's Wish",
+      "video": "/videos/sv wish.mp4",
       "mindar_targets": [5],
-      "reference_dir": "references/thishi",
+      "reference_dir": "references/sv_wish",
       "references": [
-        "references/thishi/target6.jpg"
+        "references/sv_wish/target6.jpg"
       ],
       "threshold": 0.78
     }
