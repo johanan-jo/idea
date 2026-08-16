@@ -38,15 +38,21 @@ export default function BirthdayPage() {
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-serif font-bold text-gradient-rose mb-6">
-            Happy Birthday, My Love
+            Happy Birthday, My Love ✨
           </h1>
 
-          <div className="text-sm text-pink-100/90 leading-relaxed font-serif space-y-4 max-w-lg text-left italic border-l-2 border-pink-500/40 pl-6 py-2">
-            <p>
-              &quot;Every photograph holds a secret moment in time. But standard pictures are only still frames—today, your favorite memories come alive.&quot;
+          <div className="text-sm text-pink-100/90 leading-relaxed font-serif space-y-4 max-w-lg text-left border-l-2 border-pink-500/40 pl-6 py-2">
+            <p className="italic">
+              Every photograph with you holds more than just a moment frozen in time. It carries pieces of us, little memories, quiet emotions, laughter, and moments that words could never fully explain. Every moment spent with you has its own kind of beauty, and these pictures hold a little piece of all of that.
             </p>
-            <p>
-              &quot;Use the scanner below to point your camera at the printed photos. Watch each memory play as a living video, surrounded by love.&quot;
+            <p className="italic">
+              But this time, I want you to experience a few of those memories through the words, stories, and wishes of the people who know and love you too.
+            </p>
+            <p className="italic">
+              So, take a moment, listen, and let yourself relive a little bit of what makes you so special.
+            </p>
+            <p className="not-italic text-pink-300 font-medium mt-2">
+              With Love<br />— Jo ✨
             </p>
           </div>
         </motion.div>
