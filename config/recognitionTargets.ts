@@ -66,15 +66,15 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
   },
   {
     id: "birthday",
-    name: "Beach Celebration",
-    videoUrl: "/videos/video4.mp4",
+    name: "Sipi's Wish",
+    videoUrl: "/videos/sipi wish.mp4",
     mindarTargetIndices: [3],
     referenceImages: [
       "/targets/target4.jpg",
     ],
     referenceThreshold: 0.78,
     badge: "Memory #4",
-    description: "Beach memories",
+    description: "Sipi's birthday wish memory",
     previewColor: "from-pink-600 to-purple-600",
   },
   {

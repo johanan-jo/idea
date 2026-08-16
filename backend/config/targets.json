@@ -38,8 +38,8 @@
     },
     {
       "id": "birthday",
-      "name": "Beach Celebration",
-      "video": "/videos/video4.mp4",
+      "name": "Sipi's Wish",
+      "video": "/videos/sipi wish.mp4",
       "mindar_targets": [3],
       "reference_dir": "references/birthday",
       "references": [
