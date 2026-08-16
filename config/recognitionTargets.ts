@@ -71,18 +71,16 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     mindarTargetIndices: [3],
     referenceImages: [
       "/targets/target4.jpg",
-      "/references/pink_star_marker.png",
-      "/references/star_marker.png",
     ],
     referenceThreshold: 0.78,
     badge: "Memory #4",
-    description: "Beach memories with pink glitter star marker",
+    description: "Beach memories",
     previewColor: "from-pink-600 to-purple-600",
   },
   {
     id: "group_friends",
-    name: "Friendship Circle",
-    videoUrl: "/videos/video1.mp4",
+    name: "Shriya's Wish",
+    videoUrl: "/videos/shriya wish.mp4",
     mindarTargetIndices: [4],
     referenceImages: [
       "/targets/target5.jpg",

@@ -43,17 +43,14 @@
       "mindar_targets": [3],
       "reference_dir": "references/birthday",
       "references": [
-        "references/birthday/target4.jpg",
-        "references/birthday/target4_pink_star.png",
-        "references/birthday/pink_star_marker.png",
-        "references/birthday/star_marker.png"
+        "references/birthday/target4.jpg"
       ],
       "threshold": 0.78
     },
     {
       "id": "group_friends",
-      "name": "Friendship Group",
-      "video": "/videos/video1.mp4",
+      "name": "Shriya's Wish",
+      "video": "/videos/shriya wish.mp4",
       "mindar_targets": [4],
       "reference_dir": "references/group_friends",
       "references": [

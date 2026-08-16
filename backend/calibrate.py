@@ -53,13 +53,10 @@ def run_calibration():
         ("references/girls_thumbsup/target3.jpg", "girls_thumbsup"),
         ("references/girls_thumbsup/thumbs_up.png", "girls_thumbsup"),
 
-        # Target 4: Beach + Pink Star
+        # Target 4: Beach
         ("references/birthday/target4.jpg", "birthday"),
-        ("references/birthday/target4_pink_star.png", "birthday"),
-        ("references/birthday/pink_star_marker.png", "birthday"),
-        ("references/birthday/star_marker.png", "birthday"),
 
-        # Target 5: Friendship Group
+        # Target 5: Shriya's Wish
         ("references/group_friends/target5.jpg", "group_friends"),
     ]
 
