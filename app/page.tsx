@@ -3,14 +3,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Sparkles, Camera, Heart, Gift, BookOpen, ChevronRight, Image as ImageIcon, ShieldCheck } from "lucide-react";
+import { Sparkles, Camera, Heart, Gift, BookOpen, ChevronRight, ShieldCheck } from "lucide-react";
 import BackgroundParticles from "@/components/BackgroundParticles";
 import PasswordModal from "@/components/PasswordModal";
-import { getAllARTargets } from "@/config/arTargets";
+
 
 export default function LandingPage() {
   const [isLocked, setIsLocked] = useState(false); // Can set to true for lock default
-  const targets = getAllARTargets();
+
 
   return (
     <main className="relative min-h-screen w-full flex flex-col justify-between p-4 sm:p-8 overflow-x-hidden selection:bg-pink-500 selection:text-white">
@@ -117,39 +117,6 @@ export default function LandingPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
           </Link>
-        </motion.div>
-
-        {/* Configured Memory Targets Preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="glass-panel p-6 rounded-3xl border border-pink-500/20 text-left"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-serif font-bold text-white flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-pink-400" />
-              <span>Configured Photo Memories ({targets.length})</span>
-            </h3>
-            <span className="text-xs text-pink-300/60 font-mono">targets.mind</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {targets.map((t) => (
-              <div
-                key={t.targetIndex}
-                className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center gap-3"
-              >
-                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.previewColor || 'from-pink-500 to-rose-600'} flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-md`}>
-                  #{t.targetIndex}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-white truncate">{t.title}</h4>
-                  <p className="text-[10px] text-pink-200/70 truncate">{t.subtitle}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </motion.div>
       </div>
 

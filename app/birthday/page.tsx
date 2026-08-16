@@ -3,13 +3,10 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Heart, ArrowLeft, Camera, Sparkles, Calendar, MapPin, Gift } from "lucide-react";
+import { Heart, ArrowLeft, Camera, Sparkles, Gift } from "lucide-react";
 import BackgroundParticles from "@/components/BackgroundParticles";
-import { getAllARTargets } from "@/config/arTargets";
 
 export default function BirthdayPage() {
-  const targets = getAllARTargets();
-
   return (
     <main className="relative min-h-screen w-full p-4 sm:p-8 overflow-x-hidden selection:bg-pink-500 selection:text-white">
       <BackgroundParticles />
@@ -23,14 +20,6 @@ export default function BirthdayPage() {
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Home</span>
-          </Link>
-
-          <Link
-            href="/scanner"
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-600 text-white text-xs font-bold shadow-lg glow-rose hover:scale-[1.03] transition-all"
-          >
-            <Camera className="w-4 h-4" />
-            <span>Open AR Scanner</span>
           </Link>
         </div>
 
@@ -54,74 +43,41 @@ export default function BirthdayPage() {
 
           <div className="text-sm text-pink-100/90 leading-relaxed font-serif space-y-4 max-w-lg text-left italic border-l-2 border-pink-500/40 pl-6 py-2">
             <p>
-              "Every photograph holds a secret moment in time. But standard pictures are only still frames—today, your favorite memories come alive."
+              &quot;Every photograph holds a secret moment in time. But standard pictures are only still frames—today, your favorite memories come alive.&quot;
             </p>
             <p>
-              "Use the AR scanner below to point your camera at our printed photos. Watch each memory play as a living video, surrounded by love."
+              &quot;Use the scanner below to point your camera at the printed photos. Watch each memory play as a living video, surrounded by love.&quot;
             </p>
           </div>
         </motion.div>
 
-        {/* Memory Timeline List */}
+        {/* Scan Memories CTA */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="flex flex-col gap-4"
+          className="glass-panel p-8 rounded-3xl border border-pink-500/30 text-center flex flex-col items-center gap-5"
         >
-          <h2 className="text-xl font-serif font-bold text-white flex items-center gap-2 px-2">
-            <Sparkles className="w-5 h-5 text-amber-300" />
-            <span>AR Memories Gallery</span>
-          </h2>
-
-          <div className="space-y-4">
-            {targets.map((t) => (
-              <div
-                key={t.targetIndex}
-                className="glass-panel p-5 rounded-2xl border border-pink-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group hover:border-pink-500/40 transition-all"
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${t.previewColor || 'from-pink-500 to-rose-600'} flex items-center justify-center font-bold text-white text-base shadow-lg shrink-0`}>
-                    #{t.targetIndex}
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-pink-400 tracking-wider">
-                      {t.badge}
-                    </span>
-                    <h3 className="text-lg font-serif font-bold text-white">
-                      {t.title}
-                    </h3>
-                    <p className="text-xs text-pink-100/70 mt-1">
-                      {t.description}
-                    </p>
-
-                    <div className="flex items-center gap-4 mt-3 text-[11px] text-pink-300/80">
-                      {t.date && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-amber-300" />
-                          <span>{t.date}</span>
-                        </span>
-                      )}
-                      {t.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-pink-400" />
-                          <span>{t.location}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/scanner"
-                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white/5 hover:bg-pink-500/20 text-xs font-semibold text-pink-200 border border-white/10 hover:border-pink-500/40 transition-all text-center"
-                >
-                  Scan Photo #{t.targetIndex}
-                </Link>
-              </div>
-            ))}
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center shadow-xl glow-rose animate-float">
+            <Camera className="w-8 h-8 text-white" />
           </div>
+
+          <div>
+            <h2 className="text-2xl font-serif font-bold text-white mb-2 flex items-center justify-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-300" />
+              Scan Your Memories
+            </h2>
+            <p className="text-sm text-pink-200/80 max-w-sm leading-relaxed">
+              Point your camera at any printed photo and tap the shutter. Each photograph reveals a hidden memory video made just for you.
+            </p>
+          </div>
+
+          <Link
+            href="/scanner"
+            className="w-full max-w-xs py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white font-bold text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 glow-rose hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <Camera className="w-5 h-5" /> Open Memory Scanner
+          </Link>
         </motion.div>
 
         {/* Final Surprise Link Banner */}
