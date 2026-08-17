@@ -39,7 +39,7 @@
     {
       "id": "birthday",
       "name": "Sipi's Wish",
-      "video": "/videos/sipi wish.mp4",
+      "video": "/videos/sipi_wish.mp4",
       "mindar_targets": [3],
       "reference_dir": "references/birthday",
       "references": [
@@ -50,7 +50,7 @@
     {
       "id": "group_friends",
       "name": "Shriya's Wish",
-      "video": "/videos/shriya wish.mp4",
+      "video": "/videos/shriya_wish.mp4",
       "mindar_targets": [4],
       "reference_dir": "references/group_friends",
       "references": [
@@ -61,7 +61,7 @@
     {
       "id": "sv_wish",
       "name": "SV's Wish",
-      "video": "/videos/sv wish.mp4",
+      "video": "/videos/sv_wish.mp4",
       "mindar_targets": [5],
       "reference_dir": "references/sv_wish",
       "references": [

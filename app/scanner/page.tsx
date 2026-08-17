@@ -331,15 +331,23 @@ export default function ScannerPage() {
   useEffect(() => {
     if (phase === "matched" && matchedTarget && playVideoRef.current) {
       const v = playVideoRef.current;
-      v.src = matchedTarget.videoUrl;
+      const targetSrc = encodeURI(matchedTarget.videoUrl);
       v.muted = isMuted;
-      v.currentTime = 0;
-      v.play().catch(console.warn);
+      if (!v.src.includes(targetSrc)) {
+        v.src = targetSrc;
+        v.currentTime = 0;
+        v.load();
+      }
+      v.play().catch((err) => {
+        console.warn("[Scanner] Autoplay blocked, user interaction required:", err);
+      });
     }
-  }, [phase, matchedTarget]); // eslint-disable-line
+  }, [phase, matchedTarget, isMuted]);
 
   useEffect(() => {
-    if (playVideoRef.current) playVideoRef.current.muted = isMuted;
+    if (playVideoRef.current) {
+      playVideoRef.current.muted = isMuted;
+    }
   }, [isMuted]);
 
   const handleReset = useCallback(() => {
@@ -377,13 +385,26 @@ export default function ScannerPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-30 bg-black"
+            onClick={() => {
+              if (playVideoRef.current && playVideoRef.current.paused) {
+                playVideoRef.current.play().catch(console.warn);
+              }
+            }}
           >
             <video
               ref={playVideoRef}
+              src={encodeURI(matchedTarget.videoUrl)}
               autoPlay
               loop
               playsInline
               muted={isMuted}
+              preload="auto"
+              onLoadedData={() => {
+                playVideoRef.current?.play().catch(console.warn);
+              }}
+              onError={(e) => {
+                console.error("[Scanner] Video loading error:", e);
+              }}
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 to-transparent pointer-events-none" />

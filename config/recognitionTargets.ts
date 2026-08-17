@@ -67,7 +67,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
   {
     id: "birthday",
     name: "Sipi's Wish",
-    videoUrl: "/videos/sipi wish.mp4",
+    videoUrl: "/videos/sipi_wish.mp4",
     mindarTargetIndices: [3],
     referenceImages: [
       "/targets/target4.jpg",
@@ -80,7 +80,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
   {
     id: "group_friends",
     name: "Shriya's Wish",
-    videoUrl: "/videos/shriya wish.mp4",
+    videoUrl: "/videos/shriya_wish.mp4",
     mindarTargetIndices: [4],
     referenceImages: [
       "/targets/target5.jpg",
@@ -93,7 +93,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
   {
     id: "sv_wish",
     name: "SV's Wish",
-    videoUrl: "/videos/sv wish.mp4",
+    videoUrl: "/videos/sv_wish.mp4",
     mindarTargetIndices: [5],
     referenceImages: [
       "/targets/target6.jpg",
