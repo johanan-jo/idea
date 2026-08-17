@@ -103,6 +103,19 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     description: "SV's special memory",
     previewColor: "from-sky-500 to-indigo-600",
   },
+  {
+    id: "yuvan_wish",
+    name: "Yuvan's Wish",
+    videoUrl: "/videos/yuvan_wish.mp4",
+    mindarTargetIndices: [6],
+    referenceImages: [
+      "/targets/target7.jpg",
+    ],
+    referenceThreshold: 0.78,
+    badge: "Memory #7",
+    description: "Theater celebration memory",
+    previewColor: "from-emerald-500 to-teal-600",
+  },
 ];
 
 export const getTargetById = (id: string): RecognitionTarget | undefined =>

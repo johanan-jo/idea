@@ -68,6 +68,17 @@
         "references/sv_wish/target6.jpg"
       ],
       "threshold": 0.78
+    },
+    {
+      "id": "yuvan_wish",
+      "name": "Yuvan's Wish",
+      "video": "/videos/yuvan_wish.mp4",
+      "mindar_targets": [6],
+      "reference_dir": "references/yuvan_wish",
+      "references": [
+        "references/yuvan_wish/target7.jpg"
+      ],
+      "threshold": 0.78
     }
   ]
 }
