@@ -52,8 +52,8 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
   },
   {
     id: "girls_thumbsup",
-    name: "Thumbs Up Memories",
-    videoUrl: "/videos/video3.mp4",
+    name: "Tan's Wish",
+    videoUrl: "/videos/tan_wish.mp4",
     mindarTargetIndices: [2],
     referenceImages: [
       "/targets/target3.jpg",
@@ -61,7 +61,7 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     ],
     referenceThreshold: 0.78,
     badge: "Memory #3",
-    description: "Special memory with thumbs up",
+    description: "Tan's birthday wish memory",
     previewColor: "from-pink-500 to-rose-600",
   },
   {

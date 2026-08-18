@@ -26,8 +26,8 @@
     },
     {
       "id": "girls_thumbsup",
-      "name": "Thumbs Up Memories",
-      "video": "/videos/video3.mp4",
+      "name": "Tan's Wish",
+      "video": "/videos/tan_wish.mp4",
       "mindar_targets": [2],
       "reference_dir": "references/girls_thumbsup",
       "references": [
