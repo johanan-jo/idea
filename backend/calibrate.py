@@ -64,6 +64,9 @@ def run_calibration():
 
         # Target 7: Yuvan's Wish
         ("references/yuvan_wish/target7.jpg", "yuvan_wish"),
+
+        # Target 8: Adhi's Wish
+        ("references/adhi_wish/target8.jpg", "adhi_wish"),
     ]
 
     import cv2

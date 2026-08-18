@@ -116,6 +116,19 @@ export const RECOGNITION_TARGETS: RecognitionTarget[] = [
     description: "Theater celebration memory",
     previewColor: "from-emerald-500 to-teal-600",
   },
+  {
+    id: "adhi_wish",
+    name: "Adhi's Wish",
+    videoUrl: "/videos/adhi_wish.mp4",
+    mindarTargetIndices: [7],
+    referenceImages: [
+      "/targets/target8.jpg",
+    ],
+    referenceThreshold: 0.78,
+    badge: "Memory #8",
+    description: "Van trip celebration memory",
+    previewColor: "from-amber-500 to-orange-600",
+  },
 ];
 
 export const getTargetById = (id: string): RecognitionTarget | undefined =>

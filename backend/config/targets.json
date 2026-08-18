@@ -79,6 +79,17 @@
         "references/yuvan_wish/target7.jpg"
       ],
       "threshold": 0.78
+    },
+    {
+      "id": "adhi_wish",
+      "name": "Adhi's Wish",
+      "video": "/videos/adhi_wish.mp4",
+      "mindar_targets": [7],
+      "reference_dir": "references/adhi_wish",
+      "references": [
+        "references/adhi_wish/target8.jpg"
+      ],
+      "threshold": 0.78
     }
   ]
 }
