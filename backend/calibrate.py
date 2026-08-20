@@ -41,32 +41,27 @@ def run_calibration():
 
     # Test cases: (Image Path, Expected Target ID)
     test_cases = [
-        # Target 1: Spider-Man
-        ("references/spiderman/spiderman_target.jpg", "spiderman"),
-        ("references/spiderman/spiderman_marker.png", "spiderman"),
-        ("references/spiderman/sample_photo.jpg", "spiderman"),
-
-        # Target 2: Sai Baba
-        ("references/saibaba/target2.jpg", "saibaba"),
-
-        # Target 3: Girls + Thumbs Up
+        # Target 1: Girls + Thumbs Up (Tan's Wish)
         ("references/girls_thumbsup/target3.jpg", "girls_thumbsup"),
         ("references/girls_thumbsup/thumbs_up.png", "girls_thumbsup"),
 
-        # Target 4: Beach
+        # Target 2: Beach (Sipi's Wish)
         ("references/birthday/target4.jpg", "birthday"),
 
-        # Target 5: Shriya's Wish
+        # Target 3: Shriya's Wish
         ("references/group_friends/target5.jpg", "group_friends"),
 
-        # Target 6: SV's Wish
+        # Target 4: SV's Wish
         ("references/sv_wish/target6.jpg", "sv_wish"),
 
-        # Target 7: Yuvan's Wish
+        # Target 5: Yuvan's Wish
         ("references/yuvan_wish/target7.jpg", "yuvan_wish"),
 
-        # Target 8: Adhi's Wish
+        # Target 6: Adhi's Wish
         ("references/adhi_wish/target8.jpg", "adhi_wish"),
+
+        # Target 7: Thishi's Wish (Image 9)
+        ("references/thishi_wish/target9.jpg", "thishi_wish"),
     ]
 
     import cv2

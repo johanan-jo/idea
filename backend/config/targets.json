@@ -1,34 +1,10 @@
 {
   "targets": [
     {
-      "id": "spiderman",
-      "name": "Spider-Man",
-      "video": "/videos/video1.mp4",
-      "mindar_targets": [0],
-      "reference_dir": "references/spiderman",
-      "references": [
-        "references/spiderman/spiderman_target.jpg",
-        "references/spiderman/spiderman_marker.png",
-        "references/spiderman/sample_photo.jpg"
-      ],
-      "threshold": 0.78
-    },
-    {
-      "id": "saibaba",
-      "name": "Sai Baba",
-      "video": "/videos/video2.mp4",
-      "mindar_targets": [1],
-      "reference_dir": "references/saibaba",
-      "references": [
-        "references/saibaba/target2.jpg"
-      ],
-      "threshold": 0.78
-    },
-    {
       "id": "girls_thumbsup",
       "name": "Tan's Wish",
       "video": "/videos/tan_wish.mp4",
-      "mindar_targets": [2],
+      "mindar_targets": [0],
       "reference_dir": "references/girls_thumbsup",
       "references": [
         "references/girls_thumbsup/target3.jpg",
@@ -40,7 +16,7 @@
       "id": "birthday",
       "name": "Sipi's Wish",
       "video": "/videos/sipi_wish.mp4",
-      "mindar_targets": [3],
+      "mindar_targets": [1],
       "reference_dir": "references/birthday",
       "references": [
         "references/birthday/target4.jpg"
@@ -51,7 +27,7 @@
       "id": "group_friends",
       "name": "Shriya's Wish",
       "video": "/videos/shriya_wish.mp4",
-      "mindar_targets": [4],
+      "mindar_targets": [2],
       "reference_dir": "references/group_friends",
       "references": [
         "references/group_friends/target5.jpg"
@@ -62,7 +38,7 @@
       "id": "sv_wish",
       "name": "SV's Wish",
       "video": "/videos/sv_wish.mp4",
-      "mindar_targets": [5],
+      "mindar_targets": [3],
       "reference_dir": "references/sv_wish",
       "references": [
         "references/sv_wish/target6.jpg"
@@ -73,7 +49,7 @@
       "id": "yuvan_wish",
       "name": "Yuvan's Wish",
       "video": "/videos/yuvan_wish.mp4",
-      "mindar_targets": [6],
+      "mindar_targets": [4],
       "reference_dir": "references/yuvan_wish",
       "references": [
         "references/yuvan_wish/target7.jpg"
@@ -84,10 +60,21 @@
       "id": "adhi_wish",
       "name": "Adhi's Wish",
       "video": "/videos/adhi_wish.mp4",
-      "mindar_targets": [7],
+      "mindar_targets": [5],
       "reference_dir": "references/adhi_wish",
       "references": [
         "references/adhi_wish/target8.jpg"
+      ],
+      "threshold": 0.78
+    },
+    {
+      "id": "thishi_wish",
+      "name": "Thishi's Wish",
+      "video": "/videos/thishi_wish.mp4",
+      "mindar_targets": [6],
+      "reference_dir": "references/thishi_wish",
+      "references": [
+        "references/thishi_wish/target9.jpg"
       ],
       "threshold": 0.78
     }
